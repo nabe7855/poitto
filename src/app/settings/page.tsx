@@ -5,6 +5,7 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { AuditLogList, ResetDemoButton } from "@/components/settings/audit-log";
+import { activeExtractorName } from "@/lib/extractor";
 
 export const metadata = { title: "設定" };
 
@@ -38,6 +39,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function SettingsPage() {
+  const engine = activeExtractorName();
   return (
     <>
       <PageHeader
@@ -49,6 +51,10 @@ export default function SettingsPage() {
         <Section icon={<IconBuilding size={18} stroke={1.75} />} title="組織情報">
           <Row label="組織名" value="サンプル合同会社" />
           <Row label="プラン" value="MVP（デモ）" />
+          <Row
+            label="AI抽出エンジン"
+            value={engine === "gemini" ? "Gemini（実接続）" : "モック（キー未設定）"}
+          />
           <Row label="保管リージョン" value="東京（ap-northeast-1）" />
         </Section>
 

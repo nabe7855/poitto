@@ -9,9 +9,13 @@ import {
   useRef,
   useState,
 } from "react";
-import type { AuditLog, DocType, DocumentRecord } from "@/lib/types";
+import type {
+  AuditLog,
+  DocType,
+  DocumentRecord,
+  ExtractionResult,
+} from "@/lib/types";
 import { MOCK_DOCUMENTS, MOCK_AUDIT_LOGS } from "@/lib/mock-data";
-import { getExtractor } from "@/lib/extractor";
 import { applyExtraction, confirmDraft } from "@/lib/flow";
 
 const STORAGE_KEY = "poitto:v1";
@@ -24,7 +28,33 @@ type ConfirmDraft = {
   registrationNumber: string | null;
 };
 
-type UploadMeta = { name: string; size: number; type: string };
+type UploadMeta = {
+  name: string;
+  size: number;
+  type: string;
+  /** 原本本体(base64)。あればサーバーで実抽出（Gemini）に渡す */
+  data?: string;
+  nativeText?: string;
+};
+
+async function requestExtraction(file: UploadMeta): Promise<ExtractionResult> {
+  const res = await fetch("/api/extract", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type || "application/pdf",
+      data: file.data,
+      nativeText: file.nativeText,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error || `extract failed (${res.status})`);
+  }
+  const json = (await res.json()) as { result: ExtractionResult };
+  return json.result;
+}
 
 interface StoreValue {
   documents: DocumentRecord[];
@@ -128,23 +158,31 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       setDocuments((prev) => [base, ...prev]);
       addLog({ documentId: id, action: "create", actor: "あなた", detail: `投函（${file.name}）` });
 
-      // 抽出（アダプタ経由）
-      const result = await getExtractor().extract({
-        fileName: file.name,
-        mimeType: base.mimeType,
-        data: "",
-      });
-      const updated = applyExtraction(base, result);
-      setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)));
-      addLog({
-        documentId: id,
-        action: "extract",
-        actor: "system",
-        detail: `抽出完了（確信度 ${Math.round(result.overallConfidence * 100)}%）→ ${
-          updated.status === "stored" ? "保存済み" : "要確認"
-        }`,
-      });
-      return updated;
+      // 抽出（サーバーのAPIルート経由。GEMINI_API_KEYがあればGemini、なければモック）
+      try {
+        const result = await requestExtraction(file);
+        const updated = applyExtraction(base, result);
+        setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)));
+        addLog({
+          documentId: id,
+          action: "extract",
+          actor: "system",
+          detail: `抽出完了（確信度 ${Math.round(result.overallConfidence * 100)}%）→ ${
+            updated.status === "stored" ? "保存済み" : "要確認"
+          }`,
+        });
+        return updated;
+      } catch (err) {
+        const errored: DocumentRecord = { ...base, status: "error" };
+        setDocuments((prev) => prev.map((d) => (d.id === id ? errored : d)));
+        addLog({
+          documentId: id,
+          action: "extract",
+          actor: "system",
+          detail: `抽出に失敗しました（${err instanceof Error ? err.message : "unknown"}）`,
+        });
+        return errored;
+      }
     },
     [addLog],
   );

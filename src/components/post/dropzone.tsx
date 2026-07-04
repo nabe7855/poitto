@@ -23,6 +23,20 @@ type Item = {
 
 let counter = 0;
 
+/** File を base64 文字列（data URLプレフィックス除去）に変換 */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
  * 投函ボックス。ファイルを投函すると Extractor(モック) が抽出し、
  * 命名・月別保存 or 要確認へ振り分けてストアに反映する。
@@ -34,7 +48,14 @@ export function Dropzone() {
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
-  async function submit(meta: { name: string; size: number; type: string }) {
+  const MAX_INLINE_BYTES = 15 * 1024 * 1024; // 15MB超は本体を送らない
+
+  async function submit(meta: {
+    name: string;
+    size: number;
+    type: string;
+    data?: string;
+  }) {
     const key = `local_${counter++}`;
     setItems((prev) => [
       { key, name: meta.name, size: meta.size, status: "extracting" },
@@ -46,11 +67,17 @@ export function Dropzone() {
     );
   }
 
+  async function handleFile(file: File) {
+    let data: string | undefined;
+    if (file.size <= MAX_INLINE_BYTES) {
+      data = await fileToBase64(file).catch(() => undefined);
+    }
+    await submit({ name: file.name, size: file.size, type: file.type, data });
+  }
+
   function addFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((f) =>
-      submit({ name: f.name, size: f.size, type: f.type }),
-    );
+    Array.from(files).forEach((f) => handleFile(f));
   }
 
   function addSample() {

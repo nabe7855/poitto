@@ -108,7 +108,9 @@ export class PoittoStack extends Stack {
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       writer: rds.ClusterInstance.serverlessV2("writer"),
-      serverlessV2MinCapacity: 0.5,
+      // スケール・トゥ・ゼロ: アイドル時は 0 ACU まで自動停止し課金をほぼ$0に。
+      // アクセス時に自動起動（初回は十数秒のコールドスタート）。
+      serverlessV2MinCapacity: 0,
       serverlessV2MaxCapacity: 4,
       enableDataApi: true, // Lambdaから driver 不要で SQL 実行
       defaultDatabaseName: "poitto",

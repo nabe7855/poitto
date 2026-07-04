@@ -80,6 +80,8 @@ async function processOne(tenantId, key) {
 
 async function update(tenantId, key, fields, detail, extraction) {
   await withTenant(tenantId, async (exec) => {
+    // 列ごとの型キャスト（Data APIは文字列で渡すため date 等は明示キャストが必要）
+    const CAST = { transaction_date: "::date" };
     const sets = ["status = :status"];
     const params = { key, status: fields.status, tid: tenantId };
     for (const col of [
@@ -90,7 +92,7 @@ async function update(tenantId, key, fields, detail, extraction) {
       "registration_number",
     ]) {
       if (fields[col] !== undefined) {
-        sets.push(`${col} = :${col}`);
+        sets.push(`${col} = :${col}${CAST[col] || ""}`);
         params[col] = fields[col];
       }
     }

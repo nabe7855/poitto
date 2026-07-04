@@ -145,7 +145,7 @@ async function confirmDocument(tenantId, id, body) {
     await exec(
       `update documents set
           status = 'stored',
-          transaction_date = :d,
+          transaction_date = :d::date,
           partner_name = :p,
           amount_incl_tax = :a,
           document_type = :t,

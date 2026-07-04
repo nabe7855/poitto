@@ -67,15 +67,54 @@ async function processOne(tenantId, key) {
     (k) => (conf[k] ?? 0) < REVIEW_THRESHOLD,
   );
   const status = low ? "review" : "stored";
+  const amount = Number(extraction.amountInclTax);
   const fields = {
     status,
     transaction_date: extraction.transactionDate,
     partner_name: extraction.partnerName,
-    amount_incl_tax: Number(extraction.amountInclTax),
+    amount_incl_tax: amount,
     document_type: extraction.documentType,
     registration_number: extraction.registrationNumber || null,
   };
+  // 保存済みは命名規則でファイル名・保存先を確定
+  if (status === "stored") {
+    fields.file_name = buildFileName(
+      extraction.transactionDate,
+      extraction.partnerName,
+      amount,
+      extraction.documentType,
+      mimeType,
+    );
+    fields.stored_path = storedPathOf(extraction.transactionDate);
+  }
   await update(tenantId, key, fields, `抽出完了 → ${status}`, extraction);
+}
+
+// 命名規則: 取引年月日_取引先名_税込金額_書類の種類.拡張子
+const DOC_TYPE_LABEL = {
+  invoice: "請求書",
+  receipt: "領収書",
+  quote: "見積書",
+  delivery: "納品書",
+  other: "その他",
+};
+const FILENAME_NG = /[\\/:*?"<>|]/g;
+function extFromMime(mime) {
+  if (mime.includes("pdf")) return "pdf";
+  if (mime.includes("png")) return "png";
+  if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
+  return "pdf";
+}
+function buildFileName(date, partner, amount, type, mime) {
+  if (!date || !partner || amount == null || !type) return null;
+  const [y, m, d] = date.split("-");
+  const yymmdd = `${y.slice(2)}${m.padStart(2, "0")}${d.padStart(2, "0")}`;
+  const safe = String(partner).replace(FILENAME_NG, "");
+  return `${yymmdd}_${safe}_${amount}_${DOC_TYPE_LABEL[type] || "その他"}.${extFromMime(mime)}`;
+}
+function storedPathOf(date) {
+  const [y, m] = date.split("-");
+  return `保存済み/${y}年${m.padStart(2, "0")}月/`;
 }
 
 async function update(tenantId, key, fields, detail, extraction) {
@@ -90,6 +129,8 @@ async function update(tenantId, key, fields, detail, extraction) {
       "amount_incl_tax",
       "document_type",
       "registration_number",
+      "file_name",
+      "stored_path",
     ]) {
       if (fields[col] !== undefined) {
         sets.push(`${col} = :${col}${CAST[col] || ""}`);

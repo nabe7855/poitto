@@ -90,6 +90,12 @@ alter table documents  enable row level security;
 alter table audit_logs enable row level security;
 alter table users      enable row level security;
 
+-- FORCE: テーブル所有者（Data APIの接続ユーザー）にもRLSを強制。
+-- これが無いと所有者はRLSをバイパスしてしまい、テナント分離が効かない。
+alter table documents  force row level security;
+alter table audit_logs force row level security;
+alter table users      force row level security;
+
 -- 既存ポリシーを作り直し（冪等）
 drop policy if exists tenant_isolation_documents  on documents;
 drop policy if exists tenant_isolation_audit_logs on audit_logs;

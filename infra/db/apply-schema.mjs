@@ -34,7 +34,9 @@ function toStatements(text) {
     .filter(Boolean);
 }
 
-const client = new RDSDataClient({});
+// リージョンはクラスタARNから導出（CloudShellのデフォルトus-east-1に引っ張られないように）
+const region = resourceArn.split(":")[3] || process.env.AWS_REGION;
+const client = new RDSDataClient({ region });
 
 /** 0 ACUからの復帰(数十秒)を待ちながら実行 */
 async function exec(statement) {

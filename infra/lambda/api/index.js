@@ -117,7 +117,7 @@ async function createDocument(tenantId, body) {
     );
     await exec(
       `insert into audit_logs (tenant_id, document_id, action, detail)
-       values (:tid::uuid, :did::uuid, 'create', :detail)`,
+       values (:tid::uuid, :did::uuid, 'create', :detail::jsonb)`,
       {
         tid: tenantId,
         did: rows[0].id,
@@ -169,7 +169,7 @@ async function confirmDocument(tenantId, id, body) {
     );
     await exec(
       `insert into audit_logs (tenant_id, document_id, action, detail)
-       values (:tid::uuid, :id::uuid, 'confirm', :detail)`,
+       values (:tid::uuid, :id::uuid, 'confirm', :detail::jsonb)`,
       { tid: tenantId, id, detail: JSON.stringify({ by: "user" }) },
     );
     return { ok: true };

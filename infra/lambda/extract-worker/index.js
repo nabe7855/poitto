@@ -105,7 +105,7 @@ async function update(tenantId, key, fields, detail, extraction) {
     );
     await exec(
       `insert into audit_logs (tenant_id, action, detail)
-         values (:tid::uuid, 'extract', :detail)`,
+         values (:tid::uuid, 'extract', :detail::jsonb)`,
       { tid: tenantId, detail: JSON.stringify({ message: detail }) },
     );
   });

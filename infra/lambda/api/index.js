@@ -2,7 +2,7 @@
 // ポイッと API ハンドラ（HTTP API + Cognito JWT）。
 // テナントはJWTのカスタム属性 custom:tenant_id から取得し、RLSへ渡す。
 
-const { withTenant } = require("../shared/db");
+const { withTenant, execOne } = require("../shared/db");
 const { presignGet, presignPut } = require("../shared/storage");
 
 function json(statusCode, body) {
@@ -13,19 +13,29 @@ function json(statusCode, body) {
   };
 }
 
-/** JWTクレームからテナントID・ユーザーを取り出す */
+/** JWTクレームからテナント（=ユーザーのsub）・組織名・メールを取り出す */
 function identity(event) {
   const claims = event.requestContext?.authorizer?.jwt?.claims || {};
   return {
-    tenantId: claims["custom:tenant_id"] || claims.tenant_id,
-    sub: claims.sub,
+    tenantId: claims.sub, // 1アカウント=1組織。将来の複数ユーザーはusersで拡張。
+    orgName: claims["custom:org_name"] || claims.email || "組織",
     email: claims.email,
   };
 }
 
+/** 組織(テナント)行が無ければ作成（RLS対象外のtenantsに単発upsert） */
+async function ensureTenant(tenantId, orgName) {
+  await execOne(
+    `insert into tenants (id, name) values (:tid::uuid, :name)
+     on conflict (id) do nothing`,
+    { tid: tenantId, name: orgName },
+  );
+}
+
 exports.handler = async (event) => {
-  const { tenantId } = identity(event);
-  if (!tenantId) return json(401, { error: "tenant not resolved from token" });
+  const { tenantId, orgName } = identity(event);
+  if (!tenantId) return json(401, { error: "not authenticated" });
+  await ensureTenant(tenantId, orgName);
 
   const method = event.requestContext?.http?.method;
   const routeKey = event.routeKey || `${method} ${event.rawPath}`;

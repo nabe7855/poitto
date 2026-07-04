@@ -91,4 +91,21 @@ async function withTenant(tenantId, fn) {
   }
 }
 
-module.exports = { withTenant };
+/** テナント文脈なしの単発実行（RLS非対象のtenantsテーブル等に使用） */
+async function execOne(sql, params) {
+  const res = await client.send(
+    new ExecuteStatementCommand({
+      resourceArn,
+      secretArn,
+      database,
+      sql,
+      parameters: paramsFrom(params),
+      includeResultMetadata: true,
+    }),
+  );
+  if (!res.records) return [];
+  const meta = res.columnMetadata || [];
+  return res.records.map((r) => rowToObject(meta, r));
+}
+
+module.exports = { withTenant, execOne };

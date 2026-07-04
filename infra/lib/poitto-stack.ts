@@ -43,15 +43,17 @@ export class PoittoStack extends Stack {
       ],
     });
 
-    // ── 認証: Cognito ユーザープール ──
+    // ── 認証: Cognito ユーザープール（UIから自己サインアップ可能）──
     const userPool = new cognito.UserPool(this, "UserPool", {
       userPoolName: "poitto-users",
-      selfSignUpEnabled: false,
+      selfSignUpEnabled: true, // 画面からの新規登録を許可
       signInAliases: { email: true },
+      autoVerify: { email: true }, // 確認コードをメール送信
       standardAttributes: { email: { required: true, mutable: false } },
-      // テナントIDをカスタム属性に持たせ、JWTに載せてRLSへ渡す
+      // 団体名を保持（登録時に入力）。テナントはユーザーのsubを使うためtenant_idは互換目的で残置。
       customAttributes: {
         tenant_id: new cognito.StringAttribute({ mutable: true }),
+        org_name: new cognito.StringAttribute({ mutable: true }),
       },
       passwordPolicy: { minLength: 8, requireLowercase: true, requireDigits: true },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,

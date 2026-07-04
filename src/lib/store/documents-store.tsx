@@ -25,10 +25,13 @@ import {
   apiCreateDocument,
   apiDeleteDocument,
   apiGetDocument,
+  apiListAudit,
   apiListDocuments,
+  apiListTrash,
   apiPatchDocument,
+  apiRestoreDocument,
 } from "@/lib/api/client";
-import { mapApiDoc } from "@/lib/api/map";
+import { mapApiDoc, mapApiAudit } from "@/lib/api/map";
 
 const STORAGE_KEY = "poitto:v1";
 
@@ -61,6 +64,8 @@ interface StoreValue {
   getOriginalBlob: (id: string) => Promise<Blob | null>;
   setMemo: (id: string, memo: string) => void;
   deleteDocument: (id: string) => Promise<void>;
+  restoreDocument: (id: string) => Promise<void>;
+  getTrash: () => Promise<DocumentRecord[]>;
   resetDemo: () => void;
 }
 
@@ -125,6 +130,10 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       if (!token) return;
       const rows = await apiListDocuments(token);
       setDocuments(rows.map(mapApiDoc));
+      // 操作履歴も更新（設定画面の履歴表示用）
+      apiListAudit(token)
+        .then((logs) => setAuditLogs(logs.map(mapApiAudit)))
+        .catch(() => {});
     } catch {
       /* 取得失敗は無視（次のポーリング/操作で再取得） */
     }
@@ -362,6 +371,25 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     [realMode, getIdToken, refetch, addLog],
   );
 
+  const restoreDocument = useCallback(
+    async (id: string) => {
+      if (!realMode) return;
+      const token = await getIdToken();
+      if (!token) return;
+      await apiRestoreDocument(token, id);
+      await refetch();
+    },
+    [realMode, getIdToken, refetch],
+  );
+
+  const getTrash = useCallback(async (): Promise<DocumentRecord[]> => {
+    if (!realMode) return [];
+    const token = await getIdToken();
+    if (!token) return [];
+    const rows = await apiListTrash(token);
+    return rows.map(mapApiDoc);
+  }, [realMode, getIdToken]);
+
   const getOriginalBlob = useCallback(
     async (id: string): Promise<Blob | null> => {
       // 当セッションで投函した原本があればそれを使う
@@ -403,9 +431,11 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       getOriginalBlob,
       setMemo,
       deleteDocument,
+      restoreDocument,
+      getTrash,
       resetDemo,
     }),
-    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, deleteDocument, resetDemo],
+    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, deleteDocument, restoreDocument, getTrash, resetDemo],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

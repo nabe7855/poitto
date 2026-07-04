@@ -65,3 +65,20 @@ export async function apiDeleteDocument(
 ): Promise<void> {
   await apiFetch(`/documents/${id}`, token, { method: "DELETE" });
 }
+
+export async function apiRestoreDocument(
+  token: string,
+  id: string,
+): Promise<void> {
+  await apiFetch(`/documents/${id}/restore`, token, { method: "POST" });
+}
+
+export async function apiListTrash(token: string): Promise<ApiRow[]> {
+  const json = (await apiFetch("/trash", token)) as { documents?: ApiRow[] };
+  return json.documents ?? [];
+}
+
+export async function apiListAudit(token: string): Promise<ApiRow[]> {
+  const json = (await apiFetch("/audit", token)) as { logs?: ApiRow[] };
+  return json.logs ?? [];
+}

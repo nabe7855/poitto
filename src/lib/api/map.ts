@@ -1,4 +1,11 @@
-import type { DocStatus, DocType, DocumentRecord, FieldKey } from "@/lib/types";
+import type {
+  AuditAction,
+  AuditLog,
+  DocStatus,
+  DocType,
+  DocumentRecord,
+  FieldKey,
+} from "@/lib/types";
 import type { ApiRow } from "./client";
 
 function num(v: unknown): number | null {
@@ -41,5 +48,27 @@ export function mapApiDoc(row: ApiRow): DocumentRecord {
     sizeBytes: num(row.size_bytes) ?? 0,
     uploadedAt: (row.uploaded_at as string) ?? "",
     confirmedAt: null,
+  };
+}
+
+/** API（audit_logs）→ AuditLogへ変換 */
+export function mapApiAudit(row: ApiRow): AuditLog {
+  let detail = "";
+  const raw = row.detail;
+  if (raw) {
+    try {
+      const obj = typeof raw === "string" ? JSON.parse(raw) : raw;
+      detail = (obj as { message?: string })?.message ?? "";
+    } catch {
+      detail = String(raw);
+    }
+  }
+  return {
+    id: String(row.id),
+    documentId: (row.document_id as string) ?? null,
+    action: (row.action as AuditAction) ?? "update",
+    actor: (row.partner_name as string) ?? "",
+    detail,
+    createdAt: (row.created_at as string) ?? "",
   };
 }

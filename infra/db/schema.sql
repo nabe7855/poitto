@@ -70,6 +70,9 @@ create index if not exists idx_documents_tenant_status  on documents (tenant_id,
 
 -- 既存DB向け: memo列が無ければ追加（冪等）
 alter table documents add column if not exists memo text;
+-- ソフト削除（ゴミ箱）用。null=有効、非null=削除済み。電帳法の削除履歴のため原本は保持。
+alter table documents add column if not exists deleted_at timestamptz;
+create index if not exists idx_documents_tenant_deleted on documents (tenant_id, deleted_at);
 
 -- ============================================================
 -- 監査ログ

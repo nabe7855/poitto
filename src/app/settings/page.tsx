@@ -6,6 +6,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { AuditLogList, ResetDemoButton } from "@/components/settings/audit-log";
 import { AccountSettings } from "@/components/settings/account-settings";
+import { TrashSection } from "@/components/settings/trash-section";
 import { activeExtractorName } from "@/lib/extractor";
 
 export const metadata = { title: "設定" };
@@ -77,10 +78,14 @@ export default function SettingsPage() {
 
         <Section
           icon={<IconHistory size={18} stroke={1.75} />}
-          title="監査ログ（最近）"
+          title="操作履歴（訂正・削除の履歴）"
         >
           <AuditLogList />
         </Section>
+      </div>
+
+      <div className="mt-4">
+        <TrashSection />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

@@ -3,7 +3,7 @@
 // テナントはJWTのカスタム属性 custom:tenant_id から取得し、RLSへ渡す。
 
 const { withTenant, execOne } = require("../shared/db");
-const { presignGet, presignPut, deleteObject } = require("../shared/storage");
+const { presignGet, presignPut } = require("../shared/storage");
 
 function json(statusCode, body) {
   return {
@@ -52,18 +52,30 @@ exports.handler = async (event) => {
       const body = JSON.parse(event.body || "{}");
       return json(201, await createDocument(tenantId, body));
     }
-    // 単票取得
-    if (method === "GET" && event.pathParameters?.id) {
-      return json(200, await getDocument(tenantId, event.pathParameters.id));
+    // ゴミ箱（削除済み一覧）
+    if (routeKey === "GET /trash") {
+      return json(200, await listTrash(tenantId));
+    }
+    // 操作履歴
+    if (routeKey === "GET /audit") {
+      return json(200, await listAudit(tenantId));
+    }
+    // 復元
+    if (routeKey === "POST /documents/{id}/restore" && event.pathParameters?.id) {
+      return json(200, await restoreDocument(tenantId, event.pathParameters.id));
     }
     // 確認キューでの確定
     if (method === "PATCH" && event.pathParameters?.id) {
       const body = JSON.parse(event.body || "{}");
       return json(200, await confirmDocument(tenantId, event.pathParameters.id, body));
     }
-    // 削除
+    // ゴミ箱へ（ソフト削除）
     if (method === "DELETE" && event.pathParameters?.id) {
       return json(200, await deleteDocument(tenantId, event.pathParameters.id));
+    }
+    // 単票取得
+    if (method === "GET" && event.pathParameters?.id) {
+      return json(200, await getDocument(tenantId, event.pathParameters.id));
     }
     // 月別サマリー
     if (method === "GET" && event.pathParameters?.ym) {
@@ -78,7 +90,7 @@ exports.handler = async (event) => {
 
 async function listDocuments(tenantId, q) {
   return withTenant(tenantId, async (exec) => {
-    const conds = ["tenant_id = :tid::uuid"];
+    const conds = ["tenant_id = :tid::uuid", "deleted_at is null"];
     const params = { tid: tenantId };
     if (q.from) { conds.push("transaction_date >= :from"); params.from = q.from; }
     if (q.to) { conds.push("transaction_date <= :to"); params.to = q.to; }
@@ -180,23 +192,75 @@ async function confirmDocument(tenantId, id, body) {
   });
 }
 
+// ソフト削除（ゴミ箱へ）。原本S3は保持（電帳法の削除履歴のため）。
 async function deleteDocument(tenantId, id) {
-  const key = await withTenant(tenantId, async (exec) => {
-    const rows = await exec(
-      `select original_s3_key from documents where id = :id::uuid`,
+  return withTenant(tenantId, async (exec) => {
+    await exec(
+      `update documents set deleted_at = now()
+        where id = :id::uuid and deleted_at is null`,
       { id },
     );
-    const k = rows[0]?.original_s3_key || null;
-    await exec(`delete from documents where id = :id::uuid`, { id });
     await exec(
-      `insert into audit_logs (tenant_id, action, detail)
-       values (:tid::uuid, 'delete', :detail::jsonb)`,
-      { tid: tenantId, detail: JSON.stringify({ id }) },
+      `insert into audit_logs (tenant_id, document_id, action, detail)
+       values (:tid::uuid, :id::uuid, 'delete', :detail::jsonb)`,
+      { tid: tenantId, id, detail: JSON.stringify({ message: "ゴミ箱へ移動" }) },
     );
-    return k;
+    return { ok: true };
   });
-  if (key) await deleteObject(key).catch(() => {});
-  return { ok: true };
+}
+
+// 復元
+async function restoreDocument(tenantId, id) {
+  return withTenant(tenantId, async (exec) => {
+    await exec(
+      `update documents set deleted_at = null where id = :id::uuid`,
+      { id },
+    );
+    await exec(
+      `insert into audit_logs (tenant_id, document_id, action, detail)
+       values (:tid::uuid, :id::uuid, 'update', :detail::jsonb)`,
+      { tid: tenantId, id, detail: JSON.stringify({ message: "ゴミ箱から復元" }) },
+    );
+    return { ok: true };
+  });
+}
+
+// ゴミ箱（削除済み一覧）
+async function listTrash(tenantId) {
+  return withTenant(tenantId, async (exec) => {
+    const rows = await exec(
+      `select id::text as id, status, to_char(transaction_date,'YYYY-MM-DD') as transaction_date,
+              partner_name, amount_incl_tax, document_type, registration_number,
+              file_name, stored_path, memo, model, overall_confidence,
+              mime_type, size_bytes, extraction,
+              to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') as uploaded_at
+         from documents
+        where tenant_id = :tid::uuid and deleted_at is not null
+        order by deleted_at desc
+        limit 500`,
+      { tid: tenantId },
+    );
+    return { documents: rows };
+  });
+}
+
+// 操作履歴（訂正・削除の履歴）
+async function listAudit(tenantId) {
+  return withTenant(tenantId, async (exec) => {
+    const rows = await exec(
+      `select a.id::text as id, a.action, a.detail::text as detail,
+              a.document_id::text as document_id,
+              d.partner_name,
+              to_char(a.created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') as created_at
+         from audit_logs a
+         left join documents d on d.id = a.document_id
+        where a.tenant_id = :tid::uuid
+        order by a.created_at desc
+        limit 200`,
+      { tid: tenantId },
+    );
+    return { logs: rows };
+  });
 }
 
 async function monthSummary(tenantId, ym) {
@@ -204,7 +268,7 @@ async function monthSummary(tenantId, ym) {
     const rows = await exec(
       `select count(*) as count, coalesce(sum(amount_incl_tax),0) as total
          from documents
-        where tenant_id = :tid::uuid and status = 'stored'
+        where tenant_id = :tid::uuid and status = 'stored' and deleted_at is null
           and to_char(transaction_date, 'YYYY-MM') = :ym`,
       { tid: tenantId, ym },
     );

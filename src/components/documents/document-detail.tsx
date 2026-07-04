@@ -43,7 +43,7 @@ export function DocumentDetail({
   async function onDelete() {
     if (
       !window.confirm(
-        "この証憑を削除します。元に戻せません。よろしいですか？",
+        "この証憑をゴミ箱へ移動します。設定のゴミ箱から復元できます。よろしいですか？",
       )
     ) {
       return;
@@ -205,7 +205,7 @@ export function DocumentDetail({
             className="inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-coral transition-colors hover:bg-coral-50 disabled:opacity-50"
           >
             <IconTrash size={16} stroke={1.75} />
-            {deleting ? "削除中…" : "この証憑を削除"}
+            {deleting ? "移動中…" : "ゴミ箱へ移動"}
           </button>
         </div>
       </div>

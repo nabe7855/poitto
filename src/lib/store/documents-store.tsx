@@ -26,6 +26,7 @@ type ConfirmDraft = {
   amountInclTax: number;
   documentType: DocType;
   registrationNumber: string | null;
+  memo?: string | null;
 };
 
 type UploadMeta = {

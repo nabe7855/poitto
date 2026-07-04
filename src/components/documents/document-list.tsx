@@ -1,4 +1,4 @@
-import { IconFileText } from "@tabler/icons-react";
+import { IconFileText, IconNote } from "@tabler/icons-react";
 import type { DocumentRecord } from "@/lib/types";
 import {
   displayName,
@@ -44,6 +44,12 @@ export function DocumentList({
               <span className="truncate">{d.partnerName ?? "—"}</span>
               <DocTypeBadge type={d.documentType} />
             </p>
+            {d.memo && (
+              <p className="mt-1 flex items-start gap-1 text-xs text-ink/45">
+                <IconNote size={13} stroke={1.75} className="mt-0.5 shrink-0" />
+                <span className="line-clamp-1">{d.memo}</span>
+              </p>
+            )}
           </div>
 
           <div className="hidden shrink-0 text-right sm:block">

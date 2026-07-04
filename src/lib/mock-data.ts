@@ -13,6 +13,7 @@ type Seed = {
   mimeType?: string;
   sizeBytes?: number;
   uploadedAt: string;
+  memo?: string;
 };
 
 const SEEDS: Seed[] = [
@@ -105,6 +106,7 @@ const SEEDS: Seed[] = [
     },
     sizeBytes: 64_100,
     uploadedAt: "2026-06-15T20:10:00+09:00",
+    memo: "6/15 夜間の緊急対応でスタッフ2名分の軽食を購入（残業対応）。",
   },
   {
     id: "doc_kuroneko_0612",
@@ -258,6 +260,7 @@ function toRecord(s: Seed): DocumentRecord {
     model: "mock-extractor",
     fileName: isStored ? buildFileName(base) : null,
     storedPath: isStored && ym ? storedPathOf(ym) : null,
+    memo: s.memo ?? null,
     mimeType,
     sizeBytes: s.sizeBytes ?? 120_000,
     uploadedAt: s.uploadedAt,

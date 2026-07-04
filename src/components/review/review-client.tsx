@@ -17,6 +17,7 @@ import {
 } from "@/lib/format";
 import { useDocuments } from "@/lib/store/documents-store";
 import { reviewQueue } from "@/lib/selectors";
+import { VoiceMemoField } from "./voice-memo-field";
 
 type Draft = {
   transactionDate: string;
@@ -24,6 +25,7 @@ type Draft = {
   amountInclTax: string;
   documentType: DocType;
   registrationNumber: string;
+  memo: string;
 };
 
 function toDraft(d: DocumentRecord): Draft {
@@ -33,6 +35,7 @@ function toDraft(d: DocumentRecord): Draft {
     amountInclTax: d.amountInclTax != null ? String(d.amountInclTax) : "",
     documentType: d.documentType ?? "invoice",
     registrationNumber: d.registrationNumber ?? "",
+    memo: d.memo ?? "",
   };
 }
 
@@ -74,6 +77,7 @@ export function ReviewClient() {
       amountInclTax: draft.amountInclTax ? Number(draft.amountInclTax) : 0,
       documentType: draft.documentType,
       registrationNumber: draft.registrationNumber || null,
+      memo: draft.memo.trim() || null,
     });
     setActiveId(null); // 次のキュー先頭へ自動で移る
   }
@@ -234,6 +238,11 @@ function FormPane({
             className={inputCls(conf("registrationNumber"))}
           />
         </Field>
+
+        <VoiceMemoField
+          value={draft.memo}
+          onChange={(memo) => onChange({ memo })}
+        />
       </div>
 
       {/* 生成されるファイル名プレビュー */}

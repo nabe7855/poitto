@@ -72,6 +72,7 @@ export function confirmDraft(
     amountInclTax: number;
     documentType: DocType;
     registrationNumber: string | null;
+    memo?: string | null;
   },
   at: string,
 ): DocumentRecord {
@@ -84,6 +85,7 @@ export function confirmDraft(
     amountInclTax: draft.amountInclTax,
     documentType: draft.documentType,
     registrationNumber: draft.registrationNumber,
+    memo: draft.memo ?? base.memo ?? null,
     fileName: buildFileName({ ...draft, mimeType: base.mimeType }),
     storedPath: ym ? storedPathOf(ym) : null,
     confirmedAt: at,

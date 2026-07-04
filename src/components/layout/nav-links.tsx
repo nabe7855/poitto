@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "./nav";
+import { MOCK_DOCUMENTS } from "@/lib/mock-data";
+
+/** 要確認件数（モック） */
+const REVIEW_COUNT = MOCK_DOCUMENTS.filter((d) => d.status === "review").length;
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -15,8 +19,9 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav className="flex flex-col gap-1">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+      {NAV_ITEMS.map(({ href, label, icon: Icon, badge }) => {
         const active = isActive(pathname, href);
+        const showBadge = badge === "review" && REVIEW_COUNT > 0;
         return (
           <Link
             key={href}
@@ -31,7 +36,12 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             ].join(" ")}
           >
             <Icon size={20} stroke={1.75} className="shrink-0" />
-            {label}
+            <span className="flex-1">{label}</span>
+            {showBadge && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber px-1.5 text-xs font-bold text-white">
+                {REVIEW_COUNT}
+              </span>
+            )}
           </Link>
         );
       })}
@@ -44,21 +54,29 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="grid grid-cols-5">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+    <nav className="grid grid-cols-6">
+      {NAV_ITEMS.map(({ href, label, shortLabel, icon: Icon, badge }) => {
         const active = isActive(pathname, href);
+        const showBadge = badge === "review" && REVIEW_COUNT > 0;
         return (
           <Link
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
             className={[
-              "flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
+              "relative flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
               active ? "text-coral" : "text-ink/55",
             ].join(" ")}
           >
-            <Icon size={22} stroke={active ? 2 : 1.6} />
-            {label}
+            <span className="relative">
+              <Icon size={22} stroke={active ? 2 : 1.6} />
+              {showBadge && (
+                <span className="absolute -right-2 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber px-1 text-[10px] font-bold text-white">
+                  {REVIEW_COUNT}
+                </span>
+              )}
+            </span>
+            {shortLabel ?? label}
           </Link>
         );
       })}

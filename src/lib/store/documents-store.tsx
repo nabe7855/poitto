@@ -56,6 +56,9 @@ async function requestExtraction(file: UploadMeta): Promise<ExtractionResult> {
   return json.result;
 }
 
+/** セッション中に投函した原本のバイト（base64）。永続化はしない（localStorage肥大回避） */
+export type SessionFile = { base64: string; mimeType: string };
+
 interface StoreValue {
   documents: DocumentRecord[];
   auditLogs: AuditLog[];
@@ -63,6 +66,10 @@ interface StoreValue {
   processUpload: (file: UploadMeta) => Promise<DocumentRecord>;
   /** 確認キューでの確定 */
   confirmDocument: (id: string, draft: ConfirmDraft) => void;
+  /** 当セッションで投函した原本バイト（ZIPダウンロード用。無ければundefined） */
+  getSessionFile: (id: string) => SessionFile | undefined;
+  /** メモを更新 */
+  setMemo: (id: string, memo: string) => void;
   /** デモ初期状態へ戻す */
   resetDemo: () => void;
 }
@@ -89,6 +96,8 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
   );
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => seed().auditLogs);
   const loaded = useRef(false);
+  // 当セッションで投函した原本バイト（永続化しない）
+  const sessionFiles = useRef<Map<string, SessionFile>>(new Map());
 
   useEffect(() => {
     // SSRとの不一致を避けるため、マウント後にlocalStorageから読み込む（意図的なsetState）
@@ -156,6 +165,13 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
         confirmedAt: null,
       };
       setDocuments((prev) => [base, ...prev]);
+      // 原本バイトをセッション保持（ZIPダウンロード用）
+      if (file.data) {
+        sessionFiles.current.set(id, {
+          base64: file.data,
+          mimeType: file.type || "application/pdf",
+        });
+      }
       addLog({ documentId: id, action: "create", actor: "あなた", detail: `投函（${file.name}）` });
 
       // 抽出（サーバーのAPIルート経由。GEMINI_API_KEYがあればGemini、なければモック）
@@ -203,15 +219,36 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     [addLog],
   );
 
+  const setMemo = useCallback((id: string, memo: string) => {
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, memo } : d)),
+    );
+    addLog({ documentId: id, action: "update", actor: "あなた", detail: "メモを更新" });
+  }, [addLog]);
+
+  const getSessionFile = useCallback(
+    (id: string): SessionFile | undefined => sessionFiles.current.get(id),
+    [],
+  );
+
   const resetDemo = useCallback(() => {
     const s = seed();
     setDocuments(s.documents);
     setAuditLogs(s.auditLogs);
+    sessionFiles.current.clear();
   }, []);
 
   const value = useMemo<StoreValue>(
-    () => ({ documents, auditLogs, processUpload, confirmDocument, resetDemo }),
-    [documents, auditLogs, processUpload, confirmDocument, resetDemo],
+    () => ({
+      documents,
+      auditLogs,
+      processUpload,
+      confirmDocument,
+      getSessionFile,
+      setMemo,
+      resetDemo,
+    }),
+    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, setMemo, resetDemo],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

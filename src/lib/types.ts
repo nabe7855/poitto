@@ -47,6 +47,8 @@ export interface DocumentRecord {
   // 命名・保存
   fileName: string | null;
   storedPath: string | null;
+  // 任意メモ（目的・相手・場所など。音声入力→AI整形で付与可）
+  memo?: string | null;
   // 原本
   mimeType: string;
   sizeBytes: number;

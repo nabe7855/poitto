@@ -6,11 +6,9 @@ import type { DocStatus, DocType } from "@/lib/types";
 import { filterDocuments, sumAmount, type SearchFilters } from "@/lib/selectors";
 import { useDocuments } from "@/lib/store/documents-store";
 import { DocumentList } from "@/components/documents/document-list";
-import {
-  DOC_TYPE_LABEL,
-  docTypeLabel,
-  formatYen,
-} from "@/lib/format";
+import { DOC_TYPE_LABEL, formatYen } from "@/lib/format";
+import { documentsToCsv, csvWithBom } from "@/lib/csv";
+import { downloadCsv } from "@/lib/download";
 
 const TYPE_OPTIONS: { value: DocType | "all"; label: string }[] = [
   { value: "all", label: "すべての種別" },
@@ -58,36 +56,8 @@ export function SearchClient() {
 
   const total = sumAmount(results);
 
-  function downloadCsv() {
-    const header = [
-      "取引年月日",
-      "取引先",
-      "税込金額",
-      "種別",
-      "登録番号",
-      "ファイル名",
-      "保存先",
-    ];
-    const rows = results.map((d) => [
-      d.transactionDate ?? "",
-      d.partnerName ?? "",
-      d.amountInclTax != null ? String(d.amountInclTax) : "",
-      docTypeLabel(d.documentType),
-      d.registrationNumber ?? "",
-      d.fileName ?? "",
-      d.storedPath ?? "",
-    ]);
-    const csv = [header, ...rows]
-      .map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(","))
-      .join("\r\n");
-    // Excel向けにBOM付きUTF-8
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "poitto_証憑一覧.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+  function handleCsvDownload() {
+    downloadCsv(csvWithBom(documentsToCsv(results)), "poitto_証憑一覧.csv");
   }
 
   const inputCls =
@@ -222,7 +192,7 @@ export function SearchClient() {
         </p>
         <button
           type="button"
-          onClick={downloadCsv}
+          onClick={handleCsvDownload}
           disabled={results.length === 0}
           className="inline-flex items-center gap-2 rounded-full bg-mint px-4 py-2 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
         >

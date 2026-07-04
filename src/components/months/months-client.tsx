@@ -1,16 +1,24 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { IconFolder, IconCoin, IconFiles } from "@tabler/icons-react";
+import {
+  IconFolder,
+  IconCoin,
+  IconFiles,
+  IconDownload,
+  IconLoader2,
+} from "@tabler/icons-react";
 import { DocumentList } from "@/components/documents/document-list";
 import { formatYen, monthLabel, storedPathOf } from "@/lib/format";
 import { useDocuments } from "@/lib/store/documents-store";
 import { DEMO_MONTH, documentsInMonth, monthSummaries } from "@/lib/selectors";
+import { downloadMonthZip } from "@/lib/month-download";
 
 export function MonthsClient() {
-  const { documents } = useDocuments();
+  const { documents, getSessionFile } = useDocuments();
   const summaries = useMemo(() => monthSummaries(documents), [documents]);
   const [ym, setYm] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const effectiveYm =
     ym && summaries.some((s) => s.ym === ym)
@@ -28,10 +36,20 @@ export function MonthsClient() {
   const current = summaries.find((s) => s.ym === effectiveYm) ?? summaries[0];
   const docs = documentsInMonth(effectiveYm, documents);
 
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      await downloadMonthZip(effectiveYm, docs, getSessionFile);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
-      {/* 月セレクタ */}
-      <div className="flex flex-wrap gap-2">
+      {/* 月セレクタ + ダウンロード */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-1 flex-wrap gap-2">
         {summaries.map((s) => (
           <button
             key={s.ym}
@@ -48,6 +66,20 @@ export function MonthsClient() {
             <span className="ml-1.5 opacity-70">{s.count}</span>
           </button>
         ))}
+        </div>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading || docs.length === 0}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-mint px-4 py-2 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {downloading ? (
+            <IconLoader2 size={16} className="animate-spin" />
+          ) : (
+            <IconDownload size={16} stroke={2} />
+          )}
+          この月をダウンロード
+        </button>
       </div>
 
       {/* サマリー */}

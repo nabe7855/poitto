@@ -1,5 +1,19 @@
 import type { DocType, ExtractionInput, ExtractionResult } from "@/lib/types";
+import { estimateCostJpy } from "@/lib/ai-cost"; // [COST-DEBUG] ★本番前に削除★
 import type { Extractor } from "./extractor";
+
+// [COST-DEBUG] モックでも代表的なトークン量で費用感を出す（★本番前に削除★）
+function mockUsage(): ExtractionResult["usage"] {
+  const inputTokens = 1800; // PDF1枚の目安
+  const outputTokens = 60;
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    model: "mock-extractor",
+    estimatedCostJpy: estimateCostJpy("mock-extractor", inputTokens, outputTokens),
+  };
+}
 
 /** 既知の取引先プロファイル（ファイル名/テキストのキーワードで判定） */
 type Profile = {
@@ -106,6 +120,7 @@ export class MockExtractor implements Extractor {
       overallConfidence: c,
       model: this.name,
       raw: { source: "profile", partner: p.partnerName },
+      usage: mockUsage(), // [COST-DEBUG] ★本番前に削除★
     };
   }
 
@@ -135,6 +150,7 @@ export class MockExtractor implements Extractor {
       overallConfidence: 0.7,
       model: this.name,
       raw: { source: "generated", fileName },
+      usage: mockUsage(), // [COST-DEBUG] ★本番前に削除★
     };
   }
 }

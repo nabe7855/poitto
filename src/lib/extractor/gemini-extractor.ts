@@ -2,7 +2,9 @@ import type {
   DocType,
   ExtractionInput,
   ExtractionResult,
+  ExtractionUsage,
 } from "@/lib/types";
+import { estimateCostJpy } from "@/lib/ai-cost"; // [COST-DEBUG] ★本番前に削除★
 import type { Extractor } from "./extractor";
 
 /**
@@ -35,7 +37,12 @@ export class GeminiExtractor implements Extractor {
     try {
       const pro = await this.callModel(this.proModel, input);
       // より確信度の高い方を採用
-      return pro.overallConfidence >= lite.overallConfidence ? pro : lite;
+      const chosen = pro.overallConfidence >= lite.overallConfidence ? pro : lite;
+      // [COST-DEBUG] 2回呼んだので費用は合算（★本番前に削除★）
+      if (lite.usage && pro.usage) {
+        chosen.usage = combineUsage(lite.usage, pro.usage);
+      }
+      return chosen;
     } catch {
       return lite;
     }
@@ -92,8 +99,32 @@ export class GeminiExtractor implements Extractor {
     }
 
     const parsed = JSON.parse(text) as GeminiPayload;
-    return toResult(parsed, model);
+    const result = toResult(parsed, model);
+
+    // [COST-DEBUG] トークン使用量から費用を試算（★本番前に削除★）
+    const um = json?.usageMetadata ?? {};
+    const inputTokens = Number(um.promptTokenCount ?? 0);
+    const outputTokens = Number(um.candidatesTokenCount ?? 0);
+    result.usage = {
+      inputTokens,
+      outputTokens,
+      totalTokens: Number(um.totalTokenCount ?? inputTokens + outputTokens),
+      model,
+      estimatedCostJpy: estimateCostJpy(model, inputTokens, outputTokens),
+    };
+    return result;
   }
+}
+
+// [COST-DEBUG] エスカレーション時に2回分の費用を合算（★本番前に削除★）
+function combineUsage(a: ExtractionUsage, b: ExtractionUsage): ExtractionUsage {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    totalTokens: a.totalTokens + b.totalTokens,
+    model: `${a.model}+${b.model}`,
+    estimatedCostJpy: a.estimatedCostJpy + b.estimatedCostJpy,
+  };
 }
 
 /** Geminiに返させるJSON構造 */

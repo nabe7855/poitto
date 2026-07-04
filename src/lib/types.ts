@@ -18,6 +18,15 @@ export interface ExtractionInput {
   nativeText?: string; // テキストPDFのネイティブ抽出結果（あれば）
 }
 
+/** [COST-DEBUG] AI費用試算用のトークン使用量（★本番前に削除する一時機能★） */
+export interface ExtractionUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  model: string;
+  estimatedCostJpy: number;
+}
+
 /** 抽出結果（Extractor の出力） */
 export interface ExtractionResult {
   transactionDate: ExtractedField<string>; // "YYYY-MM-DD"
@@ -28,6 +37,7 @@ export interface ExtractionResult {
   overallConfidence: number;
   model: string;
   raw?: unknown;
+  usage?: ExtractionUsage; // [COST-DEBUG] ★本番前に削除★
 }
 
 /** 証憑（アプリ内モデル。確定値＋抽出メタ＋保存情報） */
@@ -49,6 +59,7 @@ export interface DocumentRecord {
   storedPath: string | null;
   // 任意メモ（目的・相手・場所など。音声入力→AI整形で付与可）
   memo?: string | null;
+  usage?: ExtractionUsage; // [COST-DEBUG] ★本番前に削除★
   // 原本
   mimeType: string;
   sizeBytes: number;

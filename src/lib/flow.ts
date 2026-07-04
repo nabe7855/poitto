@@ -59,6 +59,7 @@ export function applyExtraction(
     model: r.model,
     fileName: stored ? buildFileName(fields) : null,
     storedPath: stored && ym ? storedPathOf(ym) : null,
+    usage: r.usage, // [COST-DEBUG] ★本番前に削除★
     confirmedAt: null,
   };
 }

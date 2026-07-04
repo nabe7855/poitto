@@ -11,14 +11,16 @@ import {
 } from "@tabler/icons-react";
 import { StatusBadge } from "@/components/ui/badges";
 import { formatBytes } from "@/lib/format";
-import type { DocStatus } from "@/lib/types";
+import type { DocStatus, ExtractionUsage } from "@/lib/types";
 import { useDocuments } from "@/lib/store/documents-store";
+import { formatJpyCost } from "@/lib/ai-cost"; // [COST-DEBUG] ★本番前に削除★
 
 type Item = {
   key: string;
   name: string;
   size: number;
   status: DocStatus;
+  usage?: ExtractionUsage; // [COST-DEBUG] ★本番前に削除★
 };
 
 let counter = 0;
@@ -50,6 +52,22 @@ export function Dropzone() {
 
   const MAX_INLINE_BYTES = 15 * 1024 * 1024; // 15MB超は本体を送らない
 
+  // [COST-DEBUG] セッション合計（★本番前に削除★）
+  const usedItems = items.filter((i) => i.usage);
+  const totalCostCount = usedItems.length;
+  const totalCost = usedItems.reduce(
+    (s, i) => s + (i.usage?.estimatedCostJpy ?? 0),
+    0,
+  );
+  const totalInput = usedItems.reduce(
+    (s, i) => s + (i.usage?.inputTokens ?? 0),
+    0,
+  );
+  const totalOutput = usedItems.reduce(
+    (s, i) => s + (i.usage?.outputTokens ?? 0),
+    0,
+  );
+
   async function submit(meta: {
     name: string;
     size: number;
@@ -63,7 +81,9 @@ export function Dropzone() {
     ]);
     const doc = await processUpload(meta);
     setItems((prev) =>
-      prev.map((p) => (p.key === key ? { ...p, status: doc.status } : p)),
+      prev.map((p) =>
+        p.key === key ? { ...p, status: doc.status, usage: doc.usage } : p,
+      ),
     );
   }
 
@@ -182,6 +202,14 @@ export function Dropzone() {
                   <p className="truncate text-sm text-ink/85">{it.name}</p>
                   <p className="mt-0.5 text-xs text-ink/50">
                     {formatBytes(it.size)}
+                    {/* [COST-DEBUG] ★本番前に削除★ */}
+                    {it.usage && (
+                      <span className="ml-2 text-ink/45">
+                        AI費用 {formatJpyCost(it.usage.estimatedCostJpy)}（入力
+                        {it.usage.inputTokens.toLocaleString()}／出力
+                        {it.usage.outputTokens.toLocaleString()}トークン）
+                      </span>
+                    )}
                   </p>
                 </div>
                 {it.status === "extracting" ? (
@@ -195,6 +223,31 @@ export function Dropzone() {
               </div>
             ))}
           </div>
+
+          {/* [COST-DEBUG] AI費用の試算（★開発用・本番前に削除★） */}
+          {totalCostCount > 0 && (
+            <div className="mt-3 rounded-xl border border-amber/30 bg-amber-50 p-3 text-xs text-ink/70">
+              <p className="font-bold text-amber">
+                🔧 AI費用の試算（開発用・本番では非表示）
+              </p>
+              <p className="mt-1">
+                この画面で抽出した {totalCostCount} 件の合計：
+                <span className="font-bold text-ink">
+                  {" "}
+                  {formatJpyCost(totalCost)}
+                </span>{" "}
+                ／ 1件あたり平均{" "}
+                <span className="font-bold text-ink">
+                  {formatJpyCost(totalCost / totalCostCount)}
+                </span>
+              </p>
+              <p className="mt-0.5 text-ink/50">
+                入力 {totalInput.toLocaleString()} ／ 出力{" "}
+                {totalOutput.toLocaleString()} トークン。
+                ※料金は概算です。実額は請求で確認してください。
+              </p>
+            </div>
+          )}
           <p className="mt-3 text-xs text-ink/45">
             保存済みは{" "}
             <Link href="/months" className="font-medium text-coral hover:underline">

@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { isRealMode } from "@/lib/auth/config";
 import {
   apiCreateDocument,
+  apiGetDocument,
   apiListDocuments,
   apiPatchDocument,
 } from "@/lib/api/client";
@@ -55,6 +56,8 @@ interface StoreValue {
   processUpload: (file: UploadMeta) => Promise<DocumentRecord>;
   confirmDocument: (id: string, draft: ConfirmDraft) => void;
   getSessionFile: (id: string) => SessionFile | undefined;
+  /** 原本の実体を取得（デモ=当セッション、本番=S3署名URL経由）。無ければnull */
+  getOriginalBlob: (id: string) => Promise<Blob | null>;
   setMemo: (id: string, memo: string) => void;
   resetDemo: () => void;
 }
@@ -341,6 +344,29 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const getOriginalBlob = useCallback(
+    async (id: string): Promise<Blob | null> => {
+      // 当セッションで投函した原本があればそれを使う
+      const sf = sessionFiles.current.get(id);
+      if (sf) return base64ToBlob(sf.base64, sf.mimeType);
+      if (!realMode) return null;
+      // 本番: 署名付きURLをAPIから取得してS3から取得
+      try {
+        const token = await getIdToken();
+        if (!token) return null;
+        const { document } = await apiGetDocument(token, id);
+        const url = document?.previewUrl;
+        if (!url) return null;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        return await res.blob();
+      } catch {
+        return null;
+      }
+    },
+    [realMode, getIdToken],
+  );
+
   const resetDemo = useCallback(() => {
     if (realMode) return;
     const s = seed();
@@ -356,10 +382,11 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       processUpload,
       confirmDocument,
       getSessionFile,
+      getOriginalBlob,
       setMemo,
       resetDemo,
     }),
-    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, setMemo, resetDemo],
+    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, resetDemo],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

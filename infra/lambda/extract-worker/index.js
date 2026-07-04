@@ -139,7 +139,16 @@ const SCHEMA = {
   required: ["transactionDate", "partnerName", "amountInclTax", "documentType", "confidence"],
 };
 
-const PROMPT = `この証憑から取引年月日(YYYY-MM-DD)、取引先名(法人格込み)、税込金額(整数)、書類種別(invoice/receipt/quote/delivery/other)、登録番号(T+13桁 or null)を抽出し、各項目のconfidence(0-1)を付けてJSONで返してください。`;
+const PROMPT = `あなたは日本の経理実務に精通した証憑の項目抽出エンジンです。次の証憑から項目を抽出し、各項目のconfidence(0-1)を付けてJSONのみで返してください。
+
+- transactionDate: 取引年月日。"YYYY-MM-DD"。請求書は請求日/締切日、領収書は受領日。和暦は西暦へ。
+- partnerName: 取引先名（法人格を含む正式名称）。
+  ★重要★ これは「証憑を発行した側＝あなたに請求/領収した相手企業」です。
+  請求書なら発行元（請求元）、領収書なら発行店。会社印・登録番号・振込口座名義の近くにある会社名が該当します。
+  「〇〇 御中/様」と書かれた宛先（受取側＝自社/自団体）は取引先ではありません。絶対に宛先を選ばないこと。
+- amountInclTax: 税込の合計金額（整数・カンマ/円記号なし）。「請求金額」「合計」「ご請求額」など総額。
+- documentType: invoice=請求書 / receipt=領収書 / quote=見積書 / delivery=納品書 / other。
+- registrationNumber: 適格請求書の登録番号 "T"+13桁。無ければ null。`;
 
 async function callGemini(base64, mimeType) {
   const key = await geminiApiKey();

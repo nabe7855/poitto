@@ -15,7 +15,7 @@ import { DEMO_MONTH, documentsInMonth, monthSummaries } from "@/lib/selectors";
 import { downloadMonthZip } from "@/lib/month-download";
 
 export function MonthsClient() {
-  const { documents, getSessionFile } = useDocuments();
+  const { documents, getOriginalBlob } = useDocuments();
   const summaries = useMemo(() => monthSummaries(documents), [documents]);
   const [ym, setYm] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -39,7 +39,7 @@ export function MonthsClient() {
   async function handleDownload() {
     setDownloading(true);
     try {
-      await downloadMonthZip(effectiveYm, docs, getSessionFile);
+      await downloadMonthZip(effectiveYm, docs, getOriginalBlob);
     } finally {
       setDownloading(false);
     }

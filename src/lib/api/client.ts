@@ -39,6 +39,15 @@ export async function apiCreateDocument(
   })) as { id: string; uploadUrl: string; s3Key: string };
 }
 
+export async function apiGetDocument(
+  token: string,
+  id: string,
+): Promise<{ document: ApiRow & { previewUrl?: string } }> {
+  return (await apiFetch(`/documents/${id}`, token)) as {
+    document: ApiRow & { previewUrl?: string };
+  };
+}
+
 export async function apiPatchDocument(
   token: string,
   id: string,

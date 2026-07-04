@@ -19,7 +19,7 @@ import { StatusBadge } from "@/components/ui/badges";
 import { VoiceMemoField } from "@/components/review/voice-memo-field";
 import { useDocuments } from "@/lib/store/documents-store";
 import { documentsToCsv, csvWithBom } from "@/lib/csv";
-import { downloadCsv, downloadBlob, base64ToBlob } from "@/lib/download";
+import { downloadCsv, downloadBlob } from "@/lib/download";
 
 /** 証憑の詳細モーダル。メモの後付け編集と、1件ごとのダウンロードができる。 */
 export function DocumentDetail({
@@ -29,11 +29,11 @@ export function DocumentDetail({
   doc: DocumentRecord;
   onClose: () => void;
 }) {
-  const { setMemo, getSessionFile } = useDocuments();
+  const { setMemo, getOriginalBlob } = useDocuments();
   const [memo, setMemoLocal] = useState(doc.memo ?? "");
   const [saved, setSaved] = useState(false);
-
-  const original = getSessionFile(doc.id);
+  const [downloading, setDownloading] = useState(false);
+  const [dlError, setDlError] = useState(false);
 
   function saveMemo() {
     setMemo(doc.id, memo.trim());
@@ -41,9 +41,19 @@ export function DocumentDetail({
     setTimeout(() => setSaved(false), 1600);
   }
 
-  function downloadOriginal() {
-    if (!original || !doc.fileName) return;
-    downloadBlob(base64ToBlob(original.base64, original.mimeType), doc.fileName);
+  async function downloadOriginal() {
+    setDownloading(true);
+    setDlError(false);
+    try {
+      const blob = await getOriginalBlob(doc.id);
+      if (!blob) {
+        setDlError(true);
+        return;
+      }
+      downloadBlob(blob, doc.fileName ?? `${doc.id}.pdf`);
+    } finally {
+      setDownloading(false);
+    }
   }
 
   function downloadDocCsv() {
@@ -122,15 +132,15 @@ export function DocumentDetail({
           <button
             type="button"
             onClick={downloadOriginal}
-            disabled={!original}
+            disabled={downloading}
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mint px-4 py-2.5 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <IconDownload size={16} stroke={2} />
-            原本をダウンロード
+            {downloading ? "取得中…" : "原本をダウンロード"}
           </button>
-          {!original && (
-            <p className="text-center text-[11px] text-ink/40">
-              ※ 原本ファイルは、この端末で今投函したものか、S3バックエンド導入後に取得できます。
+          {dlError && (
+            <p className="text-center text-[11px] text-coral">
+              原本を取得できませんでした（保存直後は少し待って再度お試しください）。
             </p>
           )}
           <button

@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { IconMenu2, IconMailbox } from "@tabler/icons-react";
+import { IconMenu2, IconMailbox, IconLogout } from "@tabler/icons-react";
+import { useAuth } from "@/lib/auth/auth-context";
 
 export function Header({ onMenuClick }: { onMenuClick: () => void }) {
+  const { realMode, status, signOut } = useAuth();
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-black/[0.06] bg-white/85 px-4 backdrop-blur-sm md:h-16 md:px-8">
       {/* モバイル: メニュー開閉 */}
@@ -40,6 +42,18 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
         <span className="hidden sm:inline">投函する</span>
         <span className="sm:hidden">投函</span>
       </Link>
+
+      {realMode && status === "authed" && (
+        <button
+          type="button"
+          onClick={() => signOut()}
+          aria-label="ログアウト"
+          title="ログアウト"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink/60 hover:bg-black/[0.05]"
+        >
+          <IconLogout size={20} stroke={1.75} />
+        </button>
+      )}
     </header>
   );
 }

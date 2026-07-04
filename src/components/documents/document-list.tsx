@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { IconFileText, IconNote } from "@tabler/icons-react";
 import type { DocumentRecord } from "@/lib/types";
 import {
@@ -6,8 +9,9 @@ import {
   formatYen,
 } from "@/lib/format";
 import { DocTypeBadge, StatusBadge } from "@/components/ui/badges";
+import { DocumentDetail } from "./document-detail";
 
-/** 証憑の一覧（レスポンシブなリスト行）。一覧・月別・検索結果で共用 */
+/** 証憑の一覧（レスポンシブなリスト行）。行クリックで詳細（メモ編集・個別DL）を開く。 */
 export function DocumentList({
   documents,
   showStatus = false,
@@ -17,6 +21,9 @@ export function DocumentList({
   showStatus?: boolean;
   emptyText?: string;
 }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = documents.find((d) => d.id === selectedId) ?? null;
+
   if (documents.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-black/10 bg-white px-6 py-10 text-center text-sm text-ink/50">
@@ -28,9 +35,11 @@ export function DocumentList({
   return (
     <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl border border-black/[0.06] bg-white">
       {documents.map((d) => (
-        <div
+        <button
           key={d.id}
-          className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-black/[0.015]"
+          type="button"
+          onClick={() => setSelectedId(d.id)}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-black/[0.015]"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-coral-50 text-coral">
             <IconFileText size={18} stroke={1.75} />
@@ -66,8 +75,12 @@ export function DocumentList({
               <StatusBadge status={d.status} />
             </div>
           )}
-        </div>
+        </button>
       ))}
+
+      {selected && (
+        <DocumentDetail doc={selected} onClose={() => setSelectedId(null)} />
+      )}
     </div>
   );
 }

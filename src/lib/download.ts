@@ -15,3 +15,11 @@ export function downloadCsv(csvWithBom: string, fileName: string): void {
     fileName,
   );
 }
+
+/** base64 を Blob に変換 */
+export function base64ToBlob(base64: string, mimeType: string): Blob {
+  const bytes = atob(base64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mimeType });
+}

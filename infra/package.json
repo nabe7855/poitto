@@ -1,0 +1,24 @@
+{
+  "name": "poitto-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "poitto-infra": "bin/poitto.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "aws-cdk": "^2.170.0",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.170.0",
+    "constructs": "^10.3.0"
+  }
+}

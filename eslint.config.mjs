@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // AWS CDK バックエンドは独自の設定・ランタイム（別途管理）
+    "infra/**",
   ]),
 ]);
 

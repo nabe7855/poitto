@@ -1,0 +1,8 @@
+node_modules/
+cdk.out/
+*.d.ts
+# tscでbin/libから生成されるJS
+bin/*.js
+lib/*.js
+*.tsbuildinfo
+.env

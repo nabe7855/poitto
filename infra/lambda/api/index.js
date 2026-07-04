@@ -3,7 +3,7 @@
 // テナントはJWTのカスタム属性 custom:tenant_id から取得し、RLSへ渡す。
 
 const { withTenant, execOne } = require("../shared/db");
-const { presignGet, presignPut } = require("../shared/storage");
+const { presignGet, presignPut, deleteObject } = require("../shared/storage");
 
 function json(statusCode, body) {
   return {
@@ -60,6 +60,10 @@ exports.handler = async (event) => {
     if (method === "PATCH" && event.pathParameters?.id) {
       const body = JSON.parse(event.body || "{}");
       return json(200, await confirmDocument(tenantId, event.pathParameters.id, body));
+    }
+    // 削除
+    if (method === "DELETE" && event.pathParameters?.id) {
+      return json(200, await deleteDocument(tenantId, event.pathParameters.id));
     }
     // 月別サマリー
     if (method === "GET" && event.pathParameters?.ym) {
@@ -174,6 +178,25 @@ async function confirmDocument(tenantId, id, body) {
     );
     return { ok: true };
   });
+}
+
+async function deleteDocument(tenantId, id) {
+  const key = await withTenant(tenantId, async (exec) => {
+    const rows = await exec(
+      `select original_s3_key from documents where id = :id::uuid`,
+      { id },
+    );
+    const k = rows[0]?.original_s3_key || null;
+    await exec(`delete from documents where id = :id::uuid`, { id });
+    await exec(
+      `insert into audit_logs (tenant_id, action, detail)
+       values (:tid::uuid, 'delete', :detail::jsonb)`,
+      { tid: tenantId, detail: JSON.stringify({ id }) },
+    );
+    return k;
+  });
+  if (key) await deleteObject(key).catch(() => {});
+  return { ok: true };
 }
 
 async function monthSummary(tenantId, ym) {

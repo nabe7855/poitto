@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { isRealMode } from "@/lib/auth/config";
 import {
   apiCreateDocument,
+  apiDeleteDocument,
   apiGetDocument,
   apiListDocuments,
   apiPatchDocument,
@@ -59,6 +60,7 @@ interface StoreValue {
   /** 原本の実体を取得（デモ=当セッション、本番=S3署名URL経由）。無ければnull */
   getOriginalBlob: (id: string) => Promise<Blob | null>;
   setMemo: (id: string, memo: string) => void;
+  deleteDocument: (id: string) => Promise<void>;
   resetDemo: () => void;
 }
 
@@ -344,6 +346,22 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const deleteDocument = useCallback(
+    async (id: string) => {
+      sessionFiles.current.delete(id);
+      if (realMode) {
+        const token = await getIdToken();
+        if (!token) return;
+        await apiDeleteDocument(token, id);
+        await refetch();
+        return;
+      }
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      addLog({ documentId: null, action: "delete", actor: "あなた", detail: "証憑を削除" });
+    },
+    [realMode, getIdToken, refetch, addLog],
+  );
+
   const getOriginalBlob = useCallback(
     async (id: string): Promise<Blob | null> => {
       // 当セッションで投函した原本があればそれを使う
@@ -384,9 +402,10 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       getSessionFile,
       getOriginalBlob,
       setMemo,
+      deleteDocument,
       resetDemo,
     }),
-    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, resetDemo],
+    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, deleteDocument, resetDemo],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

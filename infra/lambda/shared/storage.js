@@ -6,6 +6,7 @@ const {
   S3Client,
   GetObjectCommand,
   PutObjectCommand,
+  DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
@@ -30,4 +31,9 @@ async function getBytes(key) {
   return Buffer.from(await res.Body.transformToByteArray());
 }
 
-module.exports = { presignPut, presignGet, getBytes, bucket };
+/** オブジェクトを削除 */
+async function deleteObject(key) {
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
+module.exports = { presignPut, presignGet, getBytes, deleteObject, bucket };

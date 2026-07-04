@@ -192,6 +192,7 @@ export class PoittoStack extends Stack {
           CorsHttpMethod.GET,
           CorsHttpMethod.POST,
           CorsHttpMethod.PATCH,
+          CorsHttpMethod.DELETE,
           CorsHttpMethod.OPTIONS,
         ],
         allowOrigins: ["*"], // 本番はVercelのオリジンに限定する
@@ -201,7 +202,10 @@ export class PoittoStack extends Stack {
     const integration = new HttpLambdaIntegration("ApiIntegration", apiHandler);
     for (const route of [
       { path: "/documents", methods: [HttpMethod.GET, HttpMethod.POST] },
-      { path: "/documents/{id}", methods: [HttpMethod.GET, HttpMethod.PATCH] },
+      {
+        path: "/documents/{id}",
+        methods: [HttpMethod.GET, HttpMethod.PATCH, HttpMethod.DELETE],
+      },
       { path: "/months/{ym}", methods: [HttpMethod.GET] },
       { path: "/export.csv", methods: [HttpMethod.GET] },
     ]) {

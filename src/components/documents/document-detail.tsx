@@ -7,6 +7,7 @@ import {
   IconDownload,
   IconFileTypeCsv,
   IconDeviceFloppy,
+  IconTrash,
 } from "@tabler/icons-react";
 import type { DocumentRecord } from "@/lib/types";
 import {
@@ -29,11 +30,30 @@ export function DocumentDetail({
   doc: DocumentRecord;
   onClose: () => void;
 }) {
-  const { setMemo, getOriginalBlob } = useDocuments();
+  const { setMemo, getOriginalBlob, deleteDocument } = useDocuments();
   const [memo, setMemoLocal] = useState(doc.memo ?? "");
   const [saved, setSaved] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [dlError, setDlError] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function onDelete() {
+    if (
+      !window.confirm(
+        "この証憑を削除します。元に戻せません。よろしいですか？",
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteDocument(doc.id);
+      onClose();
+    } catch {
+      setDeleting(false);
+      window.alert("削除に失敗しました。時間をおいて再度お試しください。");
+    }
+  }
 
   function saveMemo() {
     setMemo(doc.id, memo.trim());
@@ -150,6 +170,15 @@ export function DocumentDetail({
           >
             <IconFileTypeCsv size={16} stroke={1.75} />
             この証憑のデータ（CSV）
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={deleting}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-coral transition-colors hover:bg-coral-50 disabled:opacity-50"
+          >
+            <IconTrash size={16} stroke={1.75} />
+            {deleting ? "削除中…" : "この証憑を削除"}
           </button>
         </div>
       </div>

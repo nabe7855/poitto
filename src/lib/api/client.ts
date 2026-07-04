@@ -58,3 +58,10 @@ export async function apiPatchDocument(
     body: JSON.stringify(body),
   });
 }
+
+export async function apiDeleteDocument(
+  token: string,
+  id: string,
+): Promise<void> {
+  await apiFetch(`/documents/${id}`, token, { method: "DELETE" });
+}

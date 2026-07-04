@@ -1,6 +1,6 @@
 "use strict";
 // DatabaseAdapter（RDS Data API 実装）。
-// 標準PostgreSQLを、トランザクション内で SET LOCAL app.tenant_id を効かせて実行し、
+// 標準PostgreSQLを、トランザクション内で set_config('app.tenant_id',...) を効かせて実行し、
 // RLSで自テナントのみに限定する。移植時はこのファイルを別ドライバ実装に差し替える。
 
 const {
@@ -15,6 +15,22 @@ const client = new RDSDataClient({});
 const resourceArn = process.env.DB_CLUSTER_ARN;
 const secretArn = process.env.DB_SECRET_ARN;
 const database = process.env.DB_NAME || "poitto";
+
+/** Aurora Serverless v2 が 0 ACU から復帰する間、少し待って再試行する */
+async function send(command) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      return await client.send(command);
+    } catch (err) {
+      const name = err && err.name;
+      if (name === "DatabaseResumingException" && attempt < 9) {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
 
 /** JS値 → Data API パラメータ */
 function toParam(name, value) {
@@ -53,13 +69,13 @@ function rowToObject(columnMeta, record) {
  * fn(exec) の exec(sql, params) は結果行の配列を返す。
  */
 async function withTenant(tenantId, fn) {
-  const begin = await client.send(
+  const begin = await send(
     new BeginTransactionCommand({ resourceArn, secretArn, database }),
   );
   const transactionId = begin.transactionId;
 
   const exec = async (sql, params) => {
-    const res = await client.send(
+    const res = await send(
       new ExecuteStatementCommand({
         resourceArn,
         secretArn,
@@ -76,24 +92,27 @@ async function withTenant(tenantId, fn) {
   };
 
   try {
-    // RLS: このトランザクション内だけ tenant_id を固定
-    await exec("SET LOCAL app.tenant_id = :tid", { tid: tenantId });
+    // RLS: このトランザクション内だけ tenant_id を固定。
+    // ※ PostgreSQLの SET はパラメータ不可のため set_config(..., is_local=true) を使う。
+    await exec("select set_config('app.tenant_id', :tid, true)", {
+      tid: tenantId,
+    });
     const result = await fn(exec);
-    await client.send(
+    await send(
       new CommitTransactionCommand({ resourceArn, secretArn, transactionId }),
     );
     return result;
   } catch (err) {
-    await client
-      .send(new RollbackTransactionCommand({ resourceArn, secretArn, transactionId }))
-      .catch(() => {});
+    await send(
+      new RollbackTransactionCommand({ resourceArn, secretArn, transactionId }),
+    ).catch(() => {});
     throw err;
   }
 }
 
 /** テナント文脈なしの単発実行（RLS非対象のtenantsテーブル等に使用） */
 async function execOne(sql, params) {
-  const res = await client.send(
+  const res = await send(
     new ExecuteStatementCommand({
       resourceArn,
       secretArn,

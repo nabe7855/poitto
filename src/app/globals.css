@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+/* =========================================================
+   ポイッと（POITTO）ブランドテーマ
+   コーラル(主) / ミント(OK) / アンバー(要確認) / インク(文字)
+   ========================================================= */
+:root {
+  --background: #ffffff;
+  --background-soft: #faf8f5; /* オフホワイト */
+  --foreground: #2c2c2a; /* インク */
+
+  --coral: #e8542b; /* 主色 */
+  --coral-600: #cf4622;
+  --coral-50: #fdeee9;
+  --mint: #1d9e75; /* 完了・OK */
+  --mint-50: #e6f5ef;
+  --amber: #ef9f27; /* 要確認 */
+  --amber-50: #fdf2df;
+}
+
+@theme inline {
+  /* 基本 */
+  --color-background: var(--background);
+  --color-background-soft: var(--background-soft);
+  --color-foreground: var(--foreground);
+  --color-ink: var(--foreground);
+
+  /* ブランドカラー（Tailwindユーティリティとして利用可: bg-coral, text-mint 等） */
+  --color-coral: var(--coral);
+  --color-coral-600: var(--coral-600);
+  --color-coral-50: var(--coral-50);
+  --color-mint: var(--mint);
+  --color-mint-50: var(--mint-50);
+  --color-amber: var(--amber);
+  --color-amber-50: var(--amber-50);
+
+  --font-sans: var(--font-noto-sans-jp);
+  --font-mono: var(--font-geist-mono);
+
+  --radius-card: 16px;
+}
+
+body {
+  background: var(--background-soft);
+  color: var(--foreground);
+  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+}
+
+/* スクロールバーを控えめに */
+* {
+  scrollbar-width: thin;
+}

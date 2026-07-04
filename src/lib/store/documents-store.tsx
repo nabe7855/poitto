@@ -17,6 +17,16 @@ import type {
 } from "@/lib/types";
 import { MOCK_DOCUMENTS, MOCK_AUDIT_LOGS } from "@/lib/mock-data";
 import { applyExtraction, confirmDraft } from "@/lib/flow";
+import { buildFileName, monthKey, storedPathOf } from "@/lib/format";
+import { base64ToBlob } from "@/lib/download";
+import { useAuth } from "@/lib/auth/auth-context";
+import { isRealMode } from "@/lib/auth/config";
+import {
+  apiCreateDocument,
+  apiListDocuments,
+  apiPatchDocument,
+} from "@/lib/api/client";
+import { mapApiDoc } from "@/lib/api/map";
 
 const STORAGE_KEY = "poitto:v1";
 
@@ -33,11 +43,40 @@ type UploadMeta = {
   name: string;
   size: number;
   type: string;
-  /** 原本本体(base64)。あればサーバーで実抽出（Gemini）に渡す */
-  data?: string;
+  data?: string; // 原本本体(base64)
   nativeText?: string;
 };
 
+export type SessionFile = { base64: string; mimeType: string };
+
+interface StoreValue {
+  documents: DocumentRecord[];
+  auditLogs: AuditLog[];
+  processUpload: (file: UploadMeta) => Promise<DocumentRecord>;
+  confirmDocument: (id: string, draft: ConfirmDraft) => void;
+  getSessionFile: (id: string) => SessionFile | undefined;
+  setMemo: (id: string, memo: string) => void;
+  resetDemo: () => void;
+}
+
+const StoreContext = createContext<StoreValue | null>(null);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+let idCounter = 0;
+function newId(prefix: string): string {
+  idCounter += 1;
+  return `${prefix}_${Date.now().toString(36)}_${idCounter}`;
+}
+
+function seed(): { documents: DocumentRecord[]; auditLogs: AuditLog[] } {
+  return {
+    documents: MOCK_DOCUMENTS.map((d) => ({ ...d })),
+    auditLogs: MOCK_AUDIT_LOGS.map((l) => ({ ...l })),
+  };
+}
+
+// デモ抽出（モックAPIルート経由）
 async function requestExtraction(file: UploadMeta): Promise<ExtractionResult> {
   const res = await fetch("/api/extract", {
     method: "POST",
@@ -57,96 +96,134 @@ async function requestExtraction(file: UploadMeta): Promise<ExtractionResult> {
   return json.result;
 }
 
-/** セッション中に投函した原本のバイト（base64）。永続化はしない（localStorage肥大回避） */
-export type SessionFile = { base64: string; mimeType: string };
-
-interface StoreValue {
-  documents: DocumentRecord[];
-  auditLogs: AuditLog[];
-  /** 投函→抽出→（命名・保存 or 要確認）まで通す */
-  processUpload: (file: UploadMeta) => Promise<DocumentRecord>;
-  /** 確認キューでの確定 */
-  confirmDocument: (id: string, draft: ConfirmDraft) => void;
-  /** 当セッションで投函した原本バイト（ZIPダウンロード用。無ければundefined） */
-  getSessionFile: (id: string) => SessionFile | undefined;
-  /** メモを更新 */
-  setMemo: (id: string, memo: string) => void;
-  /** デモ初期状態へ戻す */
-  resetDemo: () => void;
-}
-
-const StoreContext = createContext<StoreValue | null>(null);
-
-let idCounter = 0;
-function newId(prefix: string): string {
-  idCounter += 1;
-  return `${prefix}_${Date.now().toString(36)}_${idCounter}`;
-}
-
-function seed(): { documents: DocumentRecord[]; auditLogs: AuditLog[] } {
-  return {
-    documents: MOCK_DOCUMENTS.map((d) => ({ ...d })),
-    auditLogs: MOCK_AUDIT_LOGS.map((l) => ({ ...l })),
-  };
-}
-
 export function DocumentsProvider({ children }: { children: React.ReactNode }) {
-  // SSRとの不一致を避けるため、初期はシード。マウント後にlocalStorageを読む。
-  const [documents, setDocuments] = useState<DocumentRecord[]>(
-    () => seed().documents,
-  );
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => seed().auditLogs);
-  const loaded = useRef(false);
-  // 当セッションで投函した原本バイト（永続化しない）
-  const sessionFiles = useRef<Map<string, SessionFile>>(new Map());
+  const realMode = isRealMode();
+  const { status, getIdToken } = useAuth();
 
+  const [documents, setDocuments] = useState<DocumentRecord[]>(() =>
+    realMode ? [] : seed().documents,
+  );
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() =>
+    realMode ? [] : seed().auditLogs,
+  );
+  const loaded = useRef(false);
+  const sessionFiles = useRef<Map<string, SessionFile>>(new Map());
+  const docsRef = useRef<DocumentRecord[]>(documents);
   useEffect(() => {
-    // SSRとの不一致を避けるため、マウント後にlocalStorageから読み込む（意図的なsetState）
+    docsRef.current = documents;
+  }, [documents]);
+
+  // ── 本番モード: APIから一覧取得 ──
+  const refetch = useCallback(async () => {
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+      const rows = await apiListDocuments(token);
+      setDocuments(rows.map(mapApiDoc));
+    } catch {
+      /* 取得失敗は無視（次のポーリング/操作で再取得） */
+    }
+  }, [getIdToken]);
+
+  // ── 読み込み ──
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (realMode) {
+      if (status === "authed") refetch();
+      return;
+    }
+    // デモ: localStorage
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        /* eslint-disable react-hooks/set-state-in-effect */
         if (parsed?.documents) setDocuments(parsed.documents);
         if (parsed?.auditLogs) setAuditLogs(parsed.auditLogs);
-        /* eslint-enable react-hooks/set-state-in-effect */
       }
     } catch {
       /* 破損時はシードのまま */
     }
     loaded.current = true;
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [realMode, status, refetch]);
+
+  // ── デモ: localStorageへ保存 ──
+  useEffect(() => {
+    if (realMode || !loaded.current) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ documents, auditLogs }));
+    } catch {
+      /* 無視 */
+    }
+  }, [documents, auditLogs, realMode]);
+
+  const addLog = useCallback((log: Omit<AuditLog, "id" | "createdAt">) => {
+    setAuditLogs((prev) => [
+      { ...log, id: newId("log"), createdAt: new Date().toISOString() },
+      ...prev,
+    ]);
   }, []);
 
-  useEffect(() => {
-    if (!loaded.current) return;
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ documents, auditLogs }),
-      );
-    } catch {
-      /* 保存失敗は無視 */
+  const stashFile = useCallback((id: string, file: UploadMeta) => {
+    if (file.data) {
+      sessionFiles.current.set(id, {
+        base64: file.data,
+        mimeType: file.type || "application/pdf",
+      });
     }
-  }, [documents, auditLogs]);
-
-  const addLog = useCallback(
-    (log: Omit<AuditLog, "id" | "createdAt">) => {
-      setAuditLogs((prev) => [
-        {
-          ...log,
-          id: newId("log"),
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-    },
-    [],
-  );
+  }, []);
 
   const processUpload = useCallback(
     async (file: UploadMeta): Promise<DocumentRecord> => {
+      if (realMode) {
+        const token = await getIdToken();
+        if (!token) throw new Error("ログインが必要です");
+        const { id, uploadUrl } = await apiCreateDocument(token, {
+          fileName: file.name,
+          mimeType: file.type || "application/pdf",
+          sizeBytes: file.size || 0,
+        });
+        stashFile(id, file);
+        if (file.data) {
+          await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "content-type": file.type || "application/pdf" },
+            body: base64ToBlob(file.data, file.type || "application/pdf"),
+          });
+        }
+        await refetch();
+        // S3→SQS→Lambda(Gemini)の非同期抽出をポーリング
+        for (let i = 0; i < 12; i++) {
+          await sleep(3000);
+          await refetch();
+          const d = docsRef.current.find((x) => x.id === id);
+          if (d && d.status !== "extracting") return d;
+        }
+        return (
+          docsRef.current.find((x) => x.id === id) ?? {
+            id,
+            status: "extracting",
+            transactionDate: null,
+            partnerName: null,
+            amountInclTax: null,
+            documentType: null,
+            registrationNumber: null,
+            confidence: {},
+            overallConfidence: 0,
+            model: "",
+            fileName: null,
+            storedPath: null,
+            memo: null,
+            mimeType: file.type || "application/pdf",
+            sizeBytes: file.size || 0,
+            uploadedAt: new Date().toISOString(),
+            confirmedAt: null,
+          }
+        );
+      }
+
+      // ── デモモード ──
       const id = newId("doc");
-      const now = new Date().toISOString();
       const base: DocumentRecord = {
         id,
         status: "extracting",
@@ -160,22 +237,15 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
         model: "",
         fileName: null,
         storedPath: null,
+        memo: null,
         mimeType: file.type || "application/pdf",
         sizeBytes: file.size || 0,
-        uploadedAt: now,
+        uploadedAt: new Date().toISOString(),
         confirmedAt: null,
       };
       setDocuments((prev) => [base, ...prev]);
-      // 原本バイトをセッション保持（ZIPダウンロード用）
-      if (file.data) {
-        sessionFiles.current.set(id, {
-          base64: file.data,
-          mimeType: file.type || "application/pdf",
-        });
-      }
+      stashFile(id, file);
       addLog({ documentId: id, action: "create", actor: "あなた", detail: `投函（${file.name}）` });
-
-      // 抽出（サーバーのAPIルート経由。GEMINI_API_KEYがあればGemini、なければモック）
       try {
         const result = await requestExtraction(file);
         const updated = applyExtraction(base, result);
@@ -201,31 +271,70 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
         return errored;
       }
     },
-    [addLog],
+    [realMode, getIdToken, refetch, stashFile, addLog],
   );
 
   const confirmDocument = useCallback(
     (id: string, draft: ConfirmDraft) => {
+      if (realMode) {
+        (async () => {
+          const token = await getIdToken();
+          if (!token) return;
+          const d = docsRef.current.find((x) => x.id === id);
+          const mimeType = d?.mimeType ?? "application/pdf";
+          const fileName = buildFileName({ ...draft, mimeType });
+          const ym = monthKey(draft.transactionDate);
+          await apiPatchDocument(token, id, {
+            transactionDate: draft.transactionDate,
+            partnerName: draft.partnerName,
+            amountInclTax: draft.amountInclTax,
+            documentType: draft.documentType,
+            registrationNumber: draft.registrationNumber,
+            memo: draft.memo ?? null,
+            fileName,
+            storedPath: ym ? storedPathOf(ym) : null,
+          });
+          await refetch();
+        })();
+        return;
+      }
       const at = new Date().toISOString();
       setDocuments((prev) =>
         prev.map((d) => (d.id === id ? confirmDraft(d, draft, at) : d)),
       );
-      addLog({
-        documentId: id,
-        action: "confirm",
-        actor: "あなた",
-        detail: "確認して保存済みへ確定",
-      });
+      addLog({ documentId: id, action: "confirm", actor: "あなた", detail: "確認して保存済みへ確定" });
     },
-    [addLog],
+    [realMode, getIdToken, refetch, addLog],
   );
 
-  const setMemo = useCallback((id: string, memo: string) => {
-    setDocuments((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, memo } : d)),
-    );
-    addLog({ documentId: id, action: "update", actor: "あなた", detail: "メモを更新" });
-  }, [addLog]);
+  const setMemo = useCallback(
+    (id: string, memo: string) => {
+      if (realMode) {
+        (async () => {
+          const token = await getIdToken();
+          if (!token) return;
+          const d = docsRef.current.find((x) => x.id === id);
+          if (!d) return;
+          const ym = monthKey(d.transactionDate);
+          await apiPatchDocument(token, id, {
+            transactionDate: d.transactionDate,
+            partnerName: d.partnerName,
+            amountInclTax: d.amountInclTax,
+            documentType: d.documentType,
+            registrationNumber: d.registrationNumber,
+            memo,
+            fileName: d.fileName,
+            storedPath: d.storedPath ?? (ym ? storedPathOf(ym) : null),
+          });
+          await refetch();
+        })();
+        return;
+      }
+      setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, memo } : d)));
+      addLog({ documentId: id, action: "update", actor: "あなた", detail: "メモを更新" });
+    },
+    [realMode, getIdToken, refetch, addLog],
+  );
 
   const getSessionFile = useCallback(
     (id: string): SessionFile | undefined => sessionFiles.current.get(id),
@@ -233,11 +342,12 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const resetDemo = useCallback(() => {
+    if (realMode) return;
     const s = seed();
     setDocuments(s.documents);
     setAuditLogs(s.auditLogs);
     sessionFiles.current.clear();
-  }, []);
+  }, [realMode]);
 
   const value = useMemo<StoreValue>(
     () => ({

@@ -53,6 +53,8 @@ create table if not exists documents (
   -- 命名・保存
   file_name           text,
   stored_path         text,
+  -- 任意メモ（目的・相手・場所など）
+  memo                text,
   -- 監査
   uploaded_by         uuid references users(id),
   uploaded_at         timestamptz not null default now(),
@@ -65,6 +67,9 @@ create index if not exists idx_documents_tenant_date    on documents (tenant_id,
 create index if not exists idx_documents_tenant_partner on documents (tenant_id, partner_name);
 create index if not exists idx_documents_tenant_amount  on documents (tenant_id, amount_incl_tax);
 create index if not exists idx_documents_tenant_status  on documents (tenant_id, status);
+
+-- 既存DB向け: memo列が無ければ追加（冪等）
+alter table documents add column if not exists memo text;
 
 -- ============================================================
 -- 監査ログ

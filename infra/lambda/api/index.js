@@ -84,11 +84,14 @@ async function listDocuments(tenantId, q) {
     if (q.status && q.status !== "all") { conds.push("status = :st"); params.st = q.status; }
 
     const rows = await exec(
-      `select id, status, transaction_date, partner_name, amount_incl_tax,
-              document_type, registration_number, file_name, stored_path
+      `select id::text as id, status, to_char(transaction_date,'YYYY-MM-DD') as transaction_date,
+              partner_name, amount_incl_tax, document_type, registration_number,
+              file_name, stored_path, memo, model, overall_confidence,
+              mime_type, size_bytes, extraction,
+              to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') as uploaded_at
          from documents
         where ${conds.join(" and ")}
-        order by transaction_date desc nulls last
+        order by uploaded_at desc
         limit 500`,
       params,
     );
@@ -99,10 +102,11 @@ async function listDocuments(tenantId, q) {
 async function createDocument(tenantId, body) {
   const key = `originals/${tenantId}/${Date.now()}_${body.fileName || "upload"}`;
   const uploadUrl = await presignPut(key, body.mimeType || "application/pdf");
-  await withTenant(tenantId, async (exec) => {
-    await exec(
+  const id = await withTenant(tenantId, async (exec) => {
+    const rows = await exec(
       `insert into documents (tenant_id, status, original_s3_key, mime_type, size_bytes)
-       values (:tid, 'extracting', :key, :mime, :size)`,
+       values (:tid, 'extracting', :key, :mime, :size)
+       returning id::text as id`,
       {
         tid: tenantId,
         key,
@@ -111,13 +115,18 @@ async function createDocument(tenantId, body) {
       },
     );
     await exec(
-      `insert into audit_logs (tenant_id, action, detail)
-       values (:tid, 'create', :detail)`,
-      { tid: tenantId, detail: JSON.stringify({ fileName: body.fileName }) },
+      `insert into audit_logs (tenant_id, document_id, action, detail)
+       values (:tid, :did, 'create', :detail)`,
+      {
+        tid: tenantId,
+        did: rows[0].id,
+        detail: JSON.stringify({ fileName: body.fileName }),
+      },
     );
+    return rows[0].id;
   });
   // クライアントは uploadUrl に PUT → S3イベントで抽出キューへ
-  return { uploadUrl, s3Key: key };
+  return { id, uploadUrl, s3Key: key };
 }
 
 async function getDocument(tenantId, id) {
@@ -142,6 +151,7 @@ async function confirmDocument(tenantId, id, body) {
           registration_number = :r,
           file_name = :fn,
           stored_path = :sp,
+          memo = :memo,
           confirmed_at = now()
         where id = :id`,
       {
@@ -153,6 +163,7 @@ async function confirmDocument(tenantId, id, body) {
         r: body.registrationNumber || null,
         fn: body.fileName || null,
         sp: body.storedPath || null,
+        memo: body.memo || null,
       },
     );
     await exec(

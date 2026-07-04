@@ -74,7 +74,7 @@ exports.handler = async (event) => {
 
 async function listDocuments(tenantId, q) {
   return withTenant(tenantId, async (exec) => {
-    const conds = ["tenant_id = :tid"];
+    const conds = ["tenant_id = :tid::uuid"];
     const params = { tid: tenantId };
     if (q.from) { conds.push("transaction_date >= :from"); params.from = q.from; }
     if (q.to) { conds.push("transaction_date <= :to"); params.to = q.to; }
@@ -106,7 +106,7 @@ async function createDocument(tenantId, body) {
   const id = await withTenant(tenantId, async (exec) => {
     const rows = await exec(
       `insert into documents (tenant_id, status, original_s3_key, mime_type, size_bytes)
-       values (:tid, 'extracting', :key, :mime, :size)
+       values (:tid::uuid, 'extracting', :key, :mime, :size)
        returning id::text as id`,
       {
         tid: tenantId,
@@ -117,7 +117,7 @@ async function createDocument(tenantId, body) {
     );
     await exec(
       `insert into audit_logs (tenant_id, document_id, action, detail)
-       values (:tid, :did, 'create', :detail)`,
+       values (:tid::uuid, :did::uuid, 'create', :detail)`,
       {
         tid: tenantId,
         did: rows[0].id,
@@ -132,7 +132,7 @@ async function createDocument(tenantId, body) {
 
 async function getDocument(tenantId, id) {
   return withTenant(tenantId, async (exec) => {
-    const rows = await exec(`select * from documents where id = :id`, { id });
+    const rows = await exec(`select * from documents where id = :id::uuid`, { id });
     const doc = rows[0];
     if (!doc) return { error: "not found" };
     if (doc.original_s3_key) doc.previewUrl = await presignGet(doc.original_s3_key);
@@ -154,7 +154,7 @@ async function confirmDocument(tenantId, id, body) {
           stored_path = :sp,
           memo = :memo,
           confirmed_at = now()
-        where id = :id`,
+        where id = :id::uuid`,
       {
         id,
         d: body.transactionDate,
@@ -169,7 +169,7 @@ async function confirmDocument(tenantId, id, body) {
     );
     await exec(
       `insert into audit_logs (tenant_id, document_id, action, detail)
-       values (:tid, :id, 'confirm', :detail)`,
+       values (:tid::uuid, :id::uuid, 'confirm', :detail)`,
       { tid: tenantId, id, detail: JSON.stringify({ by: "user" }) },
     );
     return { ok: true };
@@ -181,7 +181,7 @@ async function monthSummary(tenantId, ym) {
     const rows = await exec(
       `select count(*) as count, coalesce(sum(amount_incl_tax),0) as total
          from documents
-        where tenant_id = :tid and status = 'stored'
+        where tenant_id = :tid::uuid and status = 'stored'
           and to_char(transaction_date, 'YYYY-MM') = :ym`,
       { tid: tenantId, ym },
     );

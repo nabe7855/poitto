@@ -100,12 +100,12 @@ async function update(tenantId, key, fields, detail, extraction) {
     }
     await exec(
       `update documents set ${sets.join(", ")}
-         where tenant_id = :tid and original_s3_key = :key`,
+         where tenant_id = :tid::uuid and original_s3_key = :key`,
       params,
     );
     await exec(
       `insert into audit_logs (tenant_id, action, detail)
-         values (:tid, 'extract', :detail)`,
+         values (:tid::uuid, 'extract', :detail)`,
       { tid: tenantId, detail: JSON.stringify({ message: detail }) },
     );
   });

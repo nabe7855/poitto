@@ -366,19 +366,34 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     async (id: string): Promise<Blob | null> => {
       // 当セッションで投函した原本があればそれを使う
       const sf = sessionFiles.current.get(id);
-      if (sf) return base64ToBlob(sf.base64, sf.mimeType);
-      if (!realMode) return null;
+      if (sf) {
+        console.log("[DL] セッション原本を使用", id);
+        return base64ToBlob(sf.base64, sf.mimeType);
+      }
+      if (!realMode) {
+        console.log("[DL] 本番モードでない → null");
+        return null;
+      }
       // 本番: 署名付きURLをAPIから取得してS3から取得
       try {
         const token = await getIdToken();
+        console.log("[DL] token取得", token ? "あり" : "なし");
         if (!token) return null;
         const { document } = await apiGetDocument(token, id);
+        console.log(
+          "[DL] apiGetDocument応答",
+          document ? Object.keys(document) : "なし",
+          "previewUrl:",
+          document?.previewUrl ? "あり" : "なし",
+        );
         const url = document?.previewUrl;
         if (!url) return null;
         const res = await fetch(url);
+        console.log("[DL] S3取得ステータス", res.status);
         if (!res.ok) return null;
         return await res.blob();
-      } catch {
+      } catch (e) {
+        console.error("[DL] エラー", e);
         return null;
       }
     },

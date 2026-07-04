@@ -4,18 +4,9 @@ import {
   IconHistory,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { MOCK_AUDIT_LOGS, getDocument } from "@/lib/mock-data";
+import { AuditLogList, ResetDemoButton } from "@/components/settings/audit-log";
 
 export const metadata = { title: "設定" };
-
-const ACTION_LABEL: Record<string, string> = {
-  create: "投函",
-  extract: "抽出",
-  confirm: "確定",
-  update: "修正",
-  export: "出力",
-  delete: "削除",
-};
 
 function Section({
   icon,
@@ -77,44 +68,16 @@ export default function SettingsPage() {
           icon={<IconHistory size={18} stroke={1.75} />}
           title="監査ログ（最近）"
         >
-          <div className="space-y-2">
-            {MOCK_AUDIT_LOGS.map((log) => {
-              const doc = log.documentId ? getDocument(log.documentId) : undefined;
-              return (
-                <div
-                  key={log.id}
-                  className="flex items-start gap-3 border-b border-black/[0.05] pb-2.5 last:border-0"
-                >
-                  <span className="mt-0.5 inline-flex shrink-0 items-center rounded-md bg-black/[0.05] px-2 py-0.5 text-xs font-medium text-ink/70">
-                    {ACTION_LABEL[log.action] ?? log.action}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-ink/80">
-                      {doc?.partnerName ?? "—"}
-                      {log.detail && (
-                        <span className="text-ink/45"> ・ {log.detail}</span>
-                      )}
-                    </p>
-                    <p className="mt-0.5 text-xs text-ink/40">
-                      {log.actor} ・{" "}
-                      {new Date(log.createdAt).toLocaleString("ja-JP", {
-                        month: "numeric",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <AuditLogList />
         </Section>
       </div>
 
-      <p className="mt-4 text-xs text-ink/40">
-        ※ フェーズ2はモック表示です。編集・メンバー管理・エクスポート設定はフェーズ5以降で有効化します。
-      </p>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-ink/40">
+          ※ 保存先はブラウザ内（インメモリ／localStorage）のデモです。編集・メンバー管理・実保管はフェーズ5以降で有効化します。
+        </p>
+        <ResetDemoButton />
+      </div>
     </>
   );
 }

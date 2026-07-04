@@ -15,6 +15,8 @@ import {
   formatBytes,
   formatConfidence,
 } from "@/lib/format";
+import { useDocuments } from "@/lib/store/documents-store";
+import { reviewQueue } from "@/lib/selectors";
 
 type Draft = {
   transactionDate: string;
@@ -34,14 +36,22 @@ function toDraft(d: DocumentRecord): Draft {
   };
 }
 
-export function ReviewClient({ initial }: { initial: DocumentRecord[] }) {
-  const [queue, setQueue] = useState<DocumentRecord[]>(initial);
-  const [activeId, setActiveId] = useState<string | null>(initial[0]?.id ?? null);
-  const [drafts, setDrafts] = useState<Record<string, Draft>>(() =>
-    Object.fromEntries(initial.map((d) => [d.id, toDraft(d)])),
-  );
+export function ReviewClient() {
+  const { documents, confirmDocument } = useDocuments();
+  const queue = useMemo(() => reviewQueue(documents), [documents]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
-  const active = queue.find((d) => d.id === activeId) ?? null;
+  // 現在のキューから有効なアクティブID・ドラフトを解決
+  const effectiveActiveId =
+    activeId && queue.some((d) => d.id === activeId)
+      ? activeId
+      : (queue[0]?.id ?? null);
+  const active = queue.find((d) => d.id === effectiveActiveId) ?? null;
+
+  function draftFor(d: DocumentRecord): Draft {
+    return drafts[d.id] ?? toDraft(d);
+  }
 
   if (queue.length === 0) {
     return (
@@ -57,12 +67,15 @@ export function ReviewClient({ initial }: { initial: DocumentRecord[] }) {
     );
   }
 
-  function confirm(id: string) {
-    setQueue((prev) => {
-      const next = prev.filter((d) => d.id !== id);
-      setActiveId(next[0]?.id ?? null);
-      return next;
+  function confirm(id: string, draft: Draft) {
+    confirmDocument(id, {
+      transactionDate: draft.transactionDate,
+      partnerName: draft.partnerName,
+      amountInclTax: draft.amountInclTax ? Number(draft.amountInclTax) : 0,
+      documentType: draft.documentType,
+      registrationNumber: draft.registrationNumber || null,
     });
+    setActiveId(null); // 次のキュー先頭へ自動で移る
   }
 
   return (
@@ -80,7 +93,7 @@ export function ReviewClient({ initial }: { initial: DocumentRecord[] }) {
             onClick={() => setActiveId(d.id)}
             className={[
               "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              d.id === activeId
+              d.id === effectiveActiveId
                 ? "bg-coral text-white"
                 : "bg-white text-ink/70 ring-1 ring-black/10 hover:bg-black/[0.03]",
             ].join(" ")}
@@ -96,14 +109,14 @@ export function ReviewClient({ initial }: { initial: DocumentRecord[] }) {
           <FormPane
             key={active.id}
             doc={active}
-            draft={drafts[active.id]}
+            draft={draftFor(active)}
             onChange={(patch) =>
               setDrafts((prev) => ({
                 ...prev,
-                [active.id]: { ...prev[active.id], ...patch },
+                [active.id]: { ...(prev[active.id] ?? toDraft(active)), ...patch },
               }))
             }
-            onConfirm={() => confirm(active.id)}
+            onConfirm={() => confirm(active.id, draftFor(active))}
           />
         </div>
       )}

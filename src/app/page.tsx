@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   IconMailbox,
@@ -11,18 +13,19 @@ import { DocumentList } from "@/components/documents/document-list";
 import { formatAmount } from "@/lib/format";
 import {
   DEMO_MONTH,
-  countByStatus,
   documentsInMonth,
   sumAmount,
 } from "@/lib/selectors";
-import { MOCK_DOCUMENTS } from "@/lib/mock-data";
+import { useDocuments } from "@/lib/store/documents-store";
 
 export default function HomePage() {
-  const monthDocs = documentsInMonth(DEMO_MONTH);
-  const reviewCount = countByStatus("review");
-  const extractingCount = countByStatus("extracting");
+  const { documents } = useDocuments();
+
+  const monthDocs = documentsInMonth(DEMO_MONTH, documents);
+  const reviewCount = documents.filter((d) => d.status === "review").length;
+  const extractingCount = documents.filter((d) => d.status === "extracting").length;
   const monthTotal = sumAmount(monthDocs);
-  const recent = [...MOCK_DOCUMENTS]
+  const recent = [...documents]
     .filter((d) => d.status === "stored")
     .sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1))
     .slice(0, 4);

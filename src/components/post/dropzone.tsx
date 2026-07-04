@@ -7,13 +7,15 @@ import {
   IconCamera,
   IconFileText,
   IconLoader2,
+  IconSparkles,
 } from "@tabler/icons-react";
 import { StatusBadge } from "@/components/ui/badges";
 import { formatBytes } from "@/lib/format";
 import type { DocStatus } from "@/lib/types";
+import { useDocuments } from "@/lib/store/documents-store";
 
 type Item = {
-  id: string;
+  key: string;
   name: string;
   size: number;
   status: DocStatus;
@@ -22,34 +24,40 @@ type Item = {
 let counter = 0;
 
 /**
- * 投函ボックス（フェーズ2はモック）。
- * ドラッグ＆ドロップ／ファイル選択／カメラ撮影に反応し、
- * 抽出中→（要確認/保存済み）の擬似進行を見せる。実処理はフェーズ3/4。
+ * 投函ボックス。ファイルを投函すると Extractor(モック) が抽出し、
+ * 命名・月別保存 or 要確認へ振り分けてストアに反映する。
  */
 export function Dropzone() {
+  const { processUpload } = useDocuments();
   const [dragOver, setDragOver] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
+  async function submit(meta: { name: string; size: number; type: string }) {
+    const key = `local_${counter++}`;
+    setItems((prev) => [
+      { key, name: meta.name, size: meta.size, status: "extracting" },
+      ...prev,
+    ]);
+    const doc = await processUpload(meta);
+    setItems((prev) =>
+      prev.map((p) => (p.key === key ? { ...p, status: doc.status } : p)),
+    );
+  }
+
   function addFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const added: Item[] = Array.from(files).map((f) => ({
-      id: `local_${counter++}`,
-      name: f.name,
-      size: f.size,
-      status: "extracting" as DocStatus,
-    }));
-    setItems((prev) => [...added, ...prev]);
+    Array.from(files).forEach((f) =>
+      submit({ name: f.name, size: f.size, type: f.type }),
+    );
+  }
 
-    // 擬似的な抽出進行（デモ用）
-    added.forEach((it, i) => {
-      const next: DocStatus = i % 3 === 1 ? "review" : "stored";
-      setTimeout(() => {
-        setItems((prev) =>
-          prev.map((p) => (p.id === it.id ? { ...p, status: next } : p)),
-        );
-      }, 1400 + i * 500);
+  function addSample() {
+    submit({
+      name: "佐川急便_請求書_2026-06.pdf",
+      size: 214_500,
+      type: "application/pdf",
     });
   }
 
@@ -87,9 +95,7 @@ export function Dropzone() {
         >
           <IconCloudUpload size={32} stroke={1.75} />
         </span>
-        <p className="mt-4 text-base font-bold text-ink">
-          ここに証憑を投函
-        </p>
+        <p className="mt-4 text-base font-bold text-ink">ここに証憑を投函</p>
         <p className="mt-1 text-sm text-ink/55">
           ドラッグ＆ドロップ、またはクリックしてファイルを選択
         </p>
@@ -107,7 +113,7 @@ export function Dropzone() {
         />
       </div>
 
-      {/* カメラ撮影（スマホ） */}
+      {/* 補助アクション */}
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -116,6 +122,14 @@ export function Dropzone() {
         >
           <IconCamera size={18} stroke={1.75} />
           カメラで撮影して投函
+        </button>
+        <button
+          type="button"
+          onClick={addSample}
+          className="inline-flex items-center gap-2 rounded-full border border-coral/30 bg-coral-50 px-4 py-2.5 text-sm font-medium text-coral transition-colors hover:bg-coral-50/70"
+        >
+          <IconSparkles size={18} stroke={1.75} />
+          サンプルを投函（佐川急便）
         </button>
         <input
           ref={cameraRef}
@@ -133,7 +147,7 @@ export function Dropzone() {
           <h2 className="mb-3 text-sm font-bold text-ink">投函したファイル</h2>
           <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl border border-black/[0.06] bg-white">
             {items.map((it) => (
-              <div key={it.id} className="flex items-center gap-3 px-4 py-3">
+              <div key={it.key} className="flex items-center gap-3 px-4 py-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-coral-50 text-coral">
                   <IconFileText size={18} stroke={1.75} />
                 </span>
@@ -155,12 +169,15 @@ export function Dropzone() {
             ))}
           </div>
           <p className="mt-3 text-xs text-ink/45">
-            ※ フェーズ2はデモ表示です。実際のAI抽出はフェーズ3・4で有効になります。
-            要確認になったものは{" "}
+            保存済みは{" "}
+            <Link href="/months" className="font-medium text-coral hover:underline">
+              月別一覧
+            </Link>{" "}
+            に、要確認は{" "}
             <Link href="/review" className="font-medium text-coral hover:underline">
               確認キュー
             </Link>{" "}
-            で修正できます。
+            に振り分けられます。
           </p>
         </div>
       )}

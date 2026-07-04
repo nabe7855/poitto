@@ -34,8 +34,12 @@
   --color-amber: var(--amber);
   --color-amber-50: var(--amber-50);
 
-  --font-sans: var(--font-noto-sans-jp);
-  --font-mono: var(--font-geist-mono);
+  /* 日本語システムフォントスタック（ビルド時のフォント取得に依存しない・移植性重視）。
+     将来ブランドフォントを自ホストする場合は、この変数を差し替える。 */
+  --font-sans: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "BIZ UDPGothic",
+    "Yu Gothic", "YuGothic", Meiryo, "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Noto Sans Mono", monospace;
 
   --radius-card: 16px;
 }
@@ -43,7 +47,7 @@
 body {
   background: var(--background-soft);
   color: var(--foreground);
-  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* スクロールバーを控えめに */

@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "./nav";
-import { MOCK_DOCUMENTS } from "@/lib/mock-data";
+import { useDocuments } from "@/lib/store/documents-store";
 
-/** 要確認件数（モック） */
-const REVIEW_COUNT = MOCK_DOCUMENTS.filter((d) => d.status === "review").length;
+function useReviewCount() {
+  const { documents } = useDocuments();
+  return documents.filter((d) => d.status === "review").length;
+}
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -16,6 +18,7 @@ function isActive(pathname: string, href: string) {
 /** サイドバー内の縦並びナビ */
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const REVIEW_COUNT = useReviewCount();
 
   return (
     <nav className="flex flex-col gap-1">
@@ -52,6 +55,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 /** モバイル下部の横並びタブ */
 export function BottomNav() {
   const pathname = usePathname();
+  const REVIEW_COUNT = useReviewCount();
 
   return (
     <nav className="grid grid-cols-6">

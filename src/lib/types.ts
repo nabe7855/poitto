@@ -10,6 +10,14 @@ export interface ExtractedField<T> {
   confidence: number; // 0..1
 }
 
+/** 抽出への入力（原本ファイル） */
+export interface ExtractionInput {
+  fileName: string;
+  mimeType: string;
+  data: ArrayBuffer | string; // バイナリ or base64（モックでは未使用）
+  nativeText?: string; // テキストPDFのネイティブ抽出結果（あれば）
+}
+
 /** 抽出結果（Extractor の出力） */
 export interface ExtractionResult {
   transactionDate: ExtractedField<string>; // "YYYY-MM-DD"

@@ -1,24 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { IconFolder, IconCoin, IconFiles } from "@tabler/icons-react";
-import type { DocumentRecord } from "@/lib/types";
-import type { MonthSummary } from "@/lib/selectors";
 import { DocumentList } from "@/components/documents/document-list";
 import { formatYen, monthLabel, storedPathOf } from "@/lib/format";
+import { useDocuments } from "@/lib/store/documents-store";
+import { DEMO_MONTH, documentsInMonth, monthSummaries } from "@/lib/selectors";
 
-export function MonthsClient({
-  summaries,
-  documentsByMonth,
-  defaultMonth,
-}: {
-  summaries: MonthSummary[];
-  documentsByMonth: Record<string, DocumentRecord[]>;
-  defaultMonth: string;
-}) {
-  const initial =
-    summaries.find((s) => s.ym === defaultMonth)?.ym ?? summaries[0]?.ym ?? "";
-  const [ym, setYm] = useState(initial);
+export function MonthsClient() {
+  const { documents } = useDocuments();
+  const summaries = useMemo(() => monthSummaries(documents), [documents]);
+  const [ym, setYm] = useState<string | null>(null);
+
+  const effectiveYm =
+    ym && summaries.some((s) => s.ym === ym)
+      ? ym
+      : (summaries.find((s) => s.ym === DEMO_MONTH)?.ym ?? summaries[0]?.ym ?? "");
 
   if (summaries.length === 0) {
     return (
@@ -28,8 +25,8 @@ export function MonthsClient({
     );
   }
 
-  const current = summaries.find((s) => s.ym === ym) ?? summaries[0];
-  const docs = documentsByMonth[ym] ?? [];
+  const current = summaries.find((s) => s.ym === effectiveYm) ?? summaries[0];
+  const docs = documentsInMonth(effectiveYm, documents);
 
   return (
     <div className="space-y-5">
@@ -42,7 +39,7 @@ export function MonthsClient({
             onClick={() => setYm(s.ym)}
             className={[
               "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-              s.ym === ym
+              s.ym === effectiveYm
                 ? "bg-coral text-white"
                 : "bg-white text-ink/70 ring-1 ring-black/10 hover:bg-black/[0.03]",
             ].join(" ")}
@@ -61,9 +58,9 @@ export function MonthsClient({
           </span>
           <div className="min-w-0">
             <p className="truncate font-mono text-xs text-ink/50">
-              {storedPathOf(ym)}
+              {storedPathOf(effectiveYm)}
             </p>
-            <p className="text-sm font-bold text-ink">{monthLabel(ym)}</p>
+            <p className="text-sm font-bold text-ink">{monthLabel(effectiveYm)}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-2xl border border-black/[0.06] bg-white p-4">

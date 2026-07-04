@@ -5,12 +5,14 @@ import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { MobileDrawer } from "./mobile-drawer";
 import { BottomNav } from "./nav-links";
+import { DocumentsProvider } from "@/lib/store/documents-store";
 
 /** サイドバー＋ヘッダーの共通レイアウト骨格 */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
+    <DocumentsProvider>
     <div className="flex min-h-screen">
       <Sidebar />
       <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
@@ -29,5 +31,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <BottomNav />
       </div>
     </div>
+    </DocumentsProvider>
   );
 }

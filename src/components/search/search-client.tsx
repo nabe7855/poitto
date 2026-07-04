@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { IconDownload, IconSearch, IconX } from "@tabler/icons-react";
 import type { DocStatus, DocType } from "@/lib/types";
 import { filterDocuments, sumAmount, type SearchFilters } from "@/lib/selectors";
+import { useDocuments } from "@/lib/store/documents-store";
 import { DocumentList } from "@/components/documents/document-list";
 import {
   DOC_TYPE_LABEL,
@@ -35,21 +36,25 @@ const EMPTY: SearchFilters = {
 };
 
 export function SearchClient() {
+  const { documents } = useDocuments();
   const [f, setF] = useState<SearchFilters & { amountMinStr?: string; amountMaxStr?: string }>(
     EMPTY,
   );
 
   const results = useMemo(() => {
-    return filterDocuments({
-      from: f.from || undefined,
-      to: f.to || undefined,
-      amountMin: f.amountMinStr ? Number(f.amountMinStr) : undefined,
-      amountMax: f.amountMaxStr ? Number(f.amountMaxStr) : undefined,
-      partner: f.partner || undefined,
-      type: f.type,
-      status: f.status,
-    });
-  }, [f]);
+    return filterDocuments(
+      {
+        from: f.from || undefined,
+        to: f.to || undefined,
+        amountMin: f.amountMinStr ? Number(f.amountMinStr) : undefined,
+        amountMax: f.amountMaxStr ? Number(f.amountMaxStr) : undefined,
+        partner: f.partner || undefined,
+        type: f.type,
+        status: f.status,
+      },
+      documents,
+    );
+  }, [f, documents]);
 
   const total = sumAmount(results);
 

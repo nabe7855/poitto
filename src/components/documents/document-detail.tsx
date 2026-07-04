@@ -8,6 +8,7 @@ import {
   IconFileTypeCsv,
   IconDeviceFloppy,
   IconTrash,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import type { DocumentRecord } from "@/lib/types";
 import {
@@ -19,6 +20,7 @@ import {
 import { StatusBadge } from "@/components/ui/badges";
 import { VoiceMemoField } from "@/components/review/voice-memo-field";
 import { useDocuments } from "@/lib/store/documents-store";
+import { duplicatesOf } from "@/lib/duplicates";
 import { documentsToCsv, csvWithBom } from "@/lib/csv";
 import { downloadCsv, downloadBlob } from "@/lib/download";
 
@@ -30,7 +32,8 @@ export function DocumentDetail({
   doc: DocumentRecord;
   onClose: () => void;
 }) {
-  const { setMemo, getOriginalBlob, deleteDocument } = useDocuments();
+  const { documents, setMemo, getOriginalBlob, deleteDocument } = useDocuments();
+  const dups = duplicatesOf(doc, documents);
   const [memo, setMemoLocal] = useState(doc.memo ?? "");
   const [saved, setSaved] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -118,6 +121,30 @@ export function DocumentDetail({
 
         {/* 本文 */}
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          {/* 重複の可能性（やわらかい警告） */}
+          {dups.length > 0 && (
+            <div className="rounded-xl border border-amber/30 bg-amber-50 p-3">
+              <p className="flex items-center gap-1.5 text-sm font-bold text-amber">
+                <IconAlertTriangle size={16} stroke={2} />
+                重複の可能性があります
+              </p>
+              <p className="mt-1 text-xs text-ink/60">
+                同じ「取引年月日・取引先・税込金額・種別」の証憑が {dups.length}{" "}
+                件あります。二重登録でなければそのままでOKです。
+              </p>
+              <ul className="mt-2 space-y-1">
+                {dups.map((d) => (
+                  <li
+                    key={d.id}
+                    className="truncate font-mono text-xs text-ink/70"
+                  >
+                    ・{displayName(d)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <dl className="grid grid-cols-3 gap-y-2.5 text-sm">
             <Row label="取引年月日" value={formatDateJp(doc.transactionDate)} />
             <Row label="取引先" value={doc.partnerName ?? "—"} />

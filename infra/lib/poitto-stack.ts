@@ -82,6 +82,21 @@ export class PoittoStack extends Stack {
       enforceSSL: true,
       versioned: true,
       removalPolicy: RemovalPolicy.RETAIN,
+      // ブラウザから署名付きURLで直接アップロード(PUT)できるようCORS許可。
+      // 認証は署名付きURL自体が担保するためオリジンは制限しない。
+      cors: [
+        {
+          allowedMethods: [
+            s3.HttpMethods.PUT,
+            s3.HttpMethods.GET,
+            s3.HttpMethods.HEAD,
+          ],
+          allowedOrigins: ["*"],
+          allowedHeaders: ["*"],
+          exposedHeaders: ["ETag"],
+          maxAge: 3000,
+        },
+      ],
     });
 
     // ── キュー: 抽出ジョブ（DLQ付き）──

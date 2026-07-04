@@ -5,6 +5,7 @@ import {
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { AuditLogList, ResetDemoButton } from "@/components/settings/audit-log";
+import { AccountSettings } from "@/components/settings/account-settings";
 import { activeExtractorName } from "@/lib/extractor";
 
 export const metadata = { title: "設定" };
@@ -46,6 +47,10 @@ export default function SettingsPage() {
         title="設定"
         description="組織情報・命名ルール・履歴を確認します。"
       />
+
+      <div className="mb-4">
+        <AccountSettings />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section icon={<IconBuilding size={18} stroke={1.75} />} title="組織情報">

@@ -22,6 +22,8 @@ interface AuthValue {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
+  updateOrgName: (orgName: string) => Promise<void>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -121,6 +123,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return session.tokens?.idToken?.toString() ?? null;
   }, [realMode]);
 
+  const updateOrgName = useCallback(async (org: string) => {
+    await configureAmplify();
+    const { updateUserAttributes, fetchAuthSession } = await import(
+      "aws-amplify/auth"
+    );
+    await updateUserAttributes({
+      userAttributes: { "custom:org_name": org },
+    });
+    // トークンを更新して custom:org_name をAPIにも反映させる
+    await fetchAuthSession({ forceRefresh: true }).catch(() => {});
+    setOrgName(org);
+  }, []);
+
+  const changePassword = useCallback(
+    async (oldPassword: string, newPassword: string) => {
+      await configureAmplify();
+      const { updatePassword } = await import("aws-amplify/auth");
+      await updatePassword({ oldPassword, newPassword });
+    },
+    [],
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -134,6 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signOut,
         getIdToken,
+        updateOrgName,
+        changePassword,
       }}
     >
       {children}

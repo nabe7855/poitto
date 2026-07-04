@@ -25,9 +25,10 @@ function identity(event) {
 
 /** 組織(テナント)行が無ければ作成（RLS対象外のtenantsに単発upsert） */
 async function ensureTenant(tenantId, orgName) {
+  // JWTのcustom:org_nameに合わせて組織名を作成/更新（設定画面での変更を反映）
   await execOne(
     `insert into tenants (id, name) values (:tid::uuid, :name)
-     on conflict (id) do nothing`,
+     on conflict (id) do update set name = excluded.name`,
     { tid: tenantId, name: orgName },
   );
 }

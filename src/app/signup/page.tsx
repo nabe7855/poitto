@@ -162,5 +162,7 @@ function toJa(err: unknown): string {
     return "確認コードの有効期限が切れています。再送してください。";
   if (name === "InvalidParameterException")
     return "入力内容を確認してください（メール形式・パスワード条件など）。";
-  return "処理に失敗しました。時間をおいて再度お試しください。";
+  // [DEBUG] 原因特定のため生のエラーを表示（後で戻す）
+  const msg = (err as { message?: string })?.message ?? "";
+  return `処理に失敗しました：${name || "?"} / ${msg}`;
 }

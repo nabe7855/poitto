@@ -8,8 +8,11 @@ import {
   IconFileText,
   IconSparkles,
   IconArrowNarrowRight,
+  IconNotes,
+  IconDeviceFloppy,
 } from "@tabler/icons-react";
 import { StatusBadge } from "@/components/ui/badges";
+import { VoiceMemoField } from "@/components/review/voice-memo-field";
 import {
   formatBytes,
   displayName,
@@ -352,6 +355,72 @@ function ConversionResult({ result }: { result: DocumentRecord }) {
         <Chip label="種別" value={docTypeLabel(result.documentType)} />
         {result.registrationNumber && (
           <Chip label="登録番号" value={result.registrationNumber} />
+        )}
+      </div>
+
+      {/* この場でメモを追加 */}
+      <InlineMemo docId={result.id} initial={result.memo ?? ""} />
+    </div>
+  );
+}
+
+/** 投函リストのその場でメモを付けられる開閉式フィールド。 */
+function InlineMemo({ docId, initial }: { docId: string; initial: string }) {
+  const { setMemo } = useDocuments();
+  const [open, setOpen] = useState(false);
+  const [memo, setMemoLocal] = useState(initial);
+  const [savedMemo, setSavedMemo] = useState(initial);
+  const [justSaved, setJustSaved] = useState(false);
+  const dirty = memo.trim() !== savedMemo.trim();
+
+  function save() {
+    const v = memo.trim();
+    setMemo(docId, v);
+    setSavedMemo(v);
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 1600);
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-2.5 inline-flex max-w-full items-center gap-1 text-xs font-medium text-coral hover:underline"
+      >
+        <IconNotes size={13} stroke={2} className="shrink-0" />
+        {savedMemo ? "メモを編集" : "メモを追加"}
+        {savedMemo && (
+          <span className="ml-1 truncate font-normal text-ink/55">
+            ：{savedMemo}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 rounded-xl border border-black/[0.06] bg-white p-2.5">
+      <VoiceMemoField value={memo} onChange={setMemoLocal} />
+      <div className="mt-1.5 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty}
+          className="inline-flex items-center gap-1.5 rounded-full bg-coral px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-coral-600 disabled:opacity-40"
+        >
+          <IconDeviceFloppy size={14} stroke={2} />
+          メモを保存
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="rounded-full px-3 py-1.5 text-xs font-medium text-ink/50 hover:bg-black/[0.04]"
+        >
+          閉じる
+        </button>
+        {justSaved && (
+          <span className="text-xs font-medium text-mint">保存しました</span>
         )}
       </div>
     </div>

@@ -6,7 +6,6 @@ import {
   IconCloudUpload,
   IconCamera,
   IconFileText,
-  IconLoader2,
   IconSparkles,
 } from "@tabler/icons-react";
 import { StatusBadge } from "@/components/ui/badges";
@@ -250,10 +249,7 @@ export function Dropzone() {
                   </p>
                 </div>
                 {it.status === "extracting" ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink/55">
-                    <IconLoader2 size={14} className="animate-spin" />
-                    抽出中
-                  </span>
+                  <ExtractingProgress />
                 ) : (
                   <StatusBadge status={it.status} />
                 )}
@@ -298,6 +294,39 @@ export function Dropzone() {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** AI抽出中の進捗ゲージ。完了時間は不定なので途中(〜92%)までスーッと溜めて待つ。 */
+function ExtractingProgress() {
+  const [pct, setPct] = useState(8);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPct((v) => {
+        if (v >= 92) return v; // 抽出完了まで手前で待機
+        const step = v < 55 ? 5 : v < 78 ? 2.5 : 0.8; // 進むほどゆっくり
+        return Math.min(92, v + step);
+      });
+    }, 350);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="w-24 shrink-0 sm:w-28">
+      <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-coral">
+        <span className="inline-flex items-center gap-1">
+          <IconSparkles size={12} stroke={2} />
+          AI変換中
+        </span>
+        <span className="tabular-nums">{Math.round(pct)}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-coral-50">
+        <div
+          className="h-full rounded-full bg-coral transition-[width] duration-300 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }

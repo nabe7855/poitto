@@ -100,6 +100,12 @@ export function Dropzone() {
     Array.from(files).forEach((f) => handleFile(f));
   }
 
+  // 同じファイルを続けて選び直しても onChange が発火するよう value をリセット
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    addFiles(e.target.files);
+    e.target.value = "";
+  }
+
   function addSample() {
     submit({
       name: "佐川急便_請求書_2026-06.pdf",
@@ -156,7 +162,7 @@ export function Dropzone() {
           accept="application/pdf,image/*"
           multiple
           className="hidden"
-          onChange={(e) => addFiles(e.target.files)}
+          onChange={onPick}
         />
       </div>
 
@@ -184,7 +190,7 @@ export function Dropzone() {
           accept="image/*"
           capture="environment"
           className="hidden"
-          onChange={(e) => addFiles(e.target.files)}
+          onChange={onPick}
         />
       </div>
 

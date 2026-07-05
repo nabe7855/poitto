@@ -7,7 +7,11 @@ import { filterDocuments, sumAmount, type SearchFilters } from "@/lib/selectors"
 import { useDocuments } from "@/lib/store/documents-store";
 import { DocumentList } from "@/components/documents/document-list";
 import { DOC_TYPE_LABEL, formatYen } from "@/lib/format";
-import { documentsToCsv, csvWithBom } from "@/lib/csv";
+import {
+  documentsToCsv,
+  documentsToAccountingCsv,
+  csvWithBom,
+} from "@/lib/csv";
 import { downloadCsv } from "@/lib/download";
 
 const TYPE_OPTIONS: { value: DocType | "all"; label: string }[] = [
@@ -58,6 +62,13 @@ export function SearchClient() {
 
   function handleCsvDownload() {
     downloadCsv(csvWithBom(documentsToCsv(results)), "poitto_証憑一覧.csv");
+  }
+
+  function handleAccountingCsvDownload() {
+    downloadCsv(
+      csvWithBom(documentsToAccountingCsv(results)),
+      "poitto_会計取込用.csv",
+    );
   }
 
   const inputCls =
@@ -190,15 +201,26 @@ export function SearchClient() {
           <span className="font-bold text-ink">{results.length}</span> 件 ／ 合計{" "}
           <span className="font-bold text-ink">{formatYen(total)}</span>
         </p>
-        <button
-          type="button"
-          onClick={handleCsvDownload}
-          disabled={results.length === 0}
-          className="inline-flex items-center gap-2 rounded-full bg-mint px-4 py-2 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <IconDownload size={16} stroke={2} />
-          CSV出力
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAccountingCsvDownload}
+            disabled={results.length === 0}
+            className="inline-flex items-center gap-2 rounded-full border border-mint/40 bg-white px-4 py-2 text-sm font-medium text-mint transition-colors hover:bg-mint-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <IconDownload size={16} stroke={2} />
+            会計用CSV
+          </button>
+          <button
+            type="button"
+            onClick={handleCsvDownload}
+            disabled={results.length === 0}
+            className="inline-flex items-center gap-2 rounded-full bg-mint px-4 py-2 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <IconDownload size={16} stroke={2} />
+            CSV出力
+          </button>
+        </div>
       </div>
 
       {/* 結果一覧 */}

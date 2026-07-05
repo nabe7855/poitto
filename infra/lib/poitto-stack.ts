@@ -34,6 +34,16 @@ export class PoittoStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
+    // 許可するフロントのオリジン（CORS）。将来ドメインを足すときはここに追加、または
+    // `cdk deploy -c allowedOrigins=https://poitto.jp,https://…` で上書き。
+    const allowedOrigins: string[] = (
+      (this.node.tryGetContext("allowedOrigins") as string | undefined) ??
+      "https://poitto-tau.vercel.app,http://localhost:3000"
+    )
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
     // ── ネットワーク（Aurora用。NATなしでコスト抑制。LambdaはData API利用でVPC不要）──
     const vpc = new ec2.Vpc(this, "Vpc", {
       maxAzs: 2,
@@ -91,7 +101,7 @@ export class PoittoStack extends Stack {
             s3.HttpMethods.GET,
             s3.HttpMethods.HEAD,
           ],
-          allowedOrigins: ["*"],
+          allowedOrigins: allowedOrigins,
           allowedHeaders: ["*"],
           exposedHeaders: ["ETag"],
           maxAge: 3000,
@@ -195,7 +205,7 @@ export class PoittoStack extends Stack {
           CorsHttpMethod.DELETE,
           CorsHttpMethod.OPTIONS,
         ],
-        allowOrigins: ["*"], // 本番はVercelのオリジンに限定する
+        allowOrigins: allowedOrigins,
       },
     });
 

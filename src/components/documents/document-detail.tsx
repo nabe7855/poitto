@@ -23,6 +23,7 @@ import { useDocuments } from "@/lib/store/documents-store";
 import { duplicatesOf } from "@/lib/duplicates";
 import { documentsToCsv, csvWithBom } from "@/lib/csv";
 import { downloadCsv, downloadBlob } from "@/lib/download";
+import { formatJpyCost } from "@/lib/ai-cost"; // [COST-DEBUG] ★本番前に削除★
 
 /** 証憑の詳細モーダル。メモの後付け編集と、1件ごとのダウンロードができる。 */
 export function DocumentDetail({
@@ -153,6 +154,19 @@ export function DocumentDetail({
             <Row label="登録番号" value={doc.registrationNumber ?? "—"} />
             <Row label="保存先" value={doc.storedPath ?? "—"} mono />
           </dl>
+
+          {/* [COST-DEBUG] AI抽出の費用（★本番前に削除★） */}
+          {doc.usage && (
+            <div className="rounded-xl border border-amber/20 bg-amber-50/50 p-2.5 text-[11px] text-ink/60">
+              🔧 AI抽出の費用（開発用）：
+              <span className="font-bold text-ink">
+                {formatJpyCost(doc.usage.estimatedCostJpy)}
+              </span>{" "}
+              （入力 {doc.usage.inputTokens.toLocaleString()} ／ 出力{" "}
+              {doc.usage.outputTokens.toLocaleString()} トークン・
+              {doc.usage.model}）
+            </div>
+          )}
 
           {/* メモ（後付け編集可） */}
           <div className="rounded-xl border border-black/[0.06] bg-background-soft p-3">

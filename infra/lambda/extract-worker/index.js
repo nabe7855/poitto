@@ -219,5 +219,14 @@ async function callGemini(base64, mimeType) {
   const j = await res.json();
   const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("empty response");
-  return JSON.parse(text);
+  const parsed = JSON.parse(text);
+  // [COST-DEBUG] 使用トークンを記録（★本番前に削除★）
+  const um = j?.usageMetadata || {};
+  parsed.usage = {
+    inputTokens: Number(um.promptTokenCount || 0),
+    outputTokens: Number(um.candidatesTokenCount || 0),
+    totalTokens: Number(um.totalTokenCount || 0),
+    model,
+  };
+  return parsed;
 }

@@ -7,9 +7,12 @@ import {
   IconFiles,
   IconDownload,
   IconLoader2,
+  IconList,
+  IconCalendarMonth,
 } from "@tabler/icons-react";
 import { DocumentList } from "@/components/documents/document-list";
-import { formatYen, monthLabel, storedPathOf } from "@/lib/format";
+import { MonthCalendar } from "./month-calendar";
+import { formatYen, monthLabel, storedPathOf, formatDateJp } from "@/lib/format";
 import { useDocuments } from "@/lib/store/documents-store";
 import { DEMO_MONTH, documentsInMonth, monthSummaries } from "@/lib/selectors";
 import { downloadMonthZip } from "@/lib/month-download";
@@ -19,6 +22,8 @@ export function MonthsClient() {
   const summaries = useMemo(() => monthSummaries(documents), [documents]);
   const [ym, setYm] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [view, setView] = useState<"list" | "calendar">("list");
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const effectiveYm =
     ym && summaries.some((s) => s.ym === ym)
@@ -115,8 +120,55 @@ export function MonthsClient() {
         </div>
       </div>
 
-      {/* 一覧 */}
-      <DocumentList documents={docs} />
+      {/* 表示切替（リスト⇄カレンダー） */}
+      <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setView("list")}
+          className={[
+            "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+            view === "list" ? "bg-coral text-white" : "text-ink/60 hover:bg-black/[0.03]",
+          ].join(" ")}
+        >
+          <IconList size={15} stroke={2} />
+          リスト
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("calendar")}
+          className={[
+            "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+            view === "calendar" ? "bg-coral text-white" : "text-ink/60 hover:bg-black/[0.03]",
+          ].join(" ")}
+        >
+          <IconCalendarMonth size={15} stroke={2} />
+          カレンダー
+        </button>
+      </div>
+
+      {view === "calendar" ? (
+        <>
+          <MonthCalendar
+            ym={effectiveYm}
+            documents={docs}
+            selectedDay={selectedDay}
+            onSelectDay={setSelectedDay}
+          />
+          {selectedDay && (
+            <div>
+              <p className="mb-2 text-sm font-bold text-ink">
+                {formatDateJp(selectedDay)} の証憑
+              </p>
+              <DocumentList
+                documents={docs.filter((d) => d.transactionDate === selectedDay)}
+                emptyText="この日の証憑はありません。"
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <DocumentList documents={docs} />
+      )}
     </div>
   );
 }

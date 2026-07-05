@@ -7,10 +7,21 @@ import {
   IconCamera,
   IconFileText,
   IconSparkles,
+  IconArrowNarrowRight,
 } from "@tabler/icons-react";
 import { StatusBadge } from "@/components/ui/badges";
-import { formatBytes } from "@/lib/format";
-import type { DocStatus, ExtractionUsage } from "@/lib/types";
+import {
+  formatBytes,
+  displayName,
+  docTypeLabel,
+  formatYen,
+  formatDateJp,
+} from "@/lib/format";
+import type {
+  DocStatus,
+  DocumentRecord,
+  ExtractionUsage,
+} from "@/lib/types";
 import { useDocuments } from "@/lib/store/documents-store";
 import { formatJpyCost } from "@/lib/ai-cost"; // [COST-DEBUG] ★本番前に削除★
 
@@ -20,6 +31,7 @@ type Item = {
   size: number;
   status: DocStatus;
   usage?: ExtractionUsage; // [COST-DEBUG] ★本番前に削除★
+  result?: DocumentRecord; // 抽出・変換の結果（保存済み/要確認の内容表示用）
 };
 
 let counter = 0;
@@ -87,7 +99,9 @@ export function Dropzone() {
     const doc = await processUpload(meta);
     setItems((prev) =>
       prev.map((p) =>
-        p.key === key ? { ...p, status: doc.status, usage: doc.usage } : p,
+        p.key === key
+          ? { ...p, status: doc.status, usage: doc.usage, result: doc }
+          : p,
       ),
     );
   }
@@ -230,28 +244,37 @@ export function Dropzone() {
           <h2 className="mb-3 text-sm font-bold text-ink">投函したファイル</h2>
           <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl border border-black/[0.06] bg-white">
             {items.map((it) => (
-              <div key={it.key} className="flex items-center gap-3 px-4 py-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-coral-50 text-coral">
-                  <IconFileText size={18} stroke={1.75} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-ink/85">{it.name}</p>
-                  <p className="mt-0.5 text-xs text-ink/50">
-                    {formatBytes(it.size)}
-                    {/* [COST-DEBUG] ★本番前に削除★ */}
-                    {it.usage && (
-                      <span className="ml-2 text-ink/45">
-                        AI費用 {formatJpyCost(it.usage.estimatedCostJpy)}（入力
-                        {it.usage.inputTokens.toLocaleString()}／出力
-                        {it.usage.outputTokens.toLocaleString()}トークン）
-                      </span>
-                    )}
-                  </p>
+              <div key={it.key} className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-coral-50 text-coral">
+                    <IconFileText size={18} stroke={1.75} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-ink/60">
+                      {it.name}
+                    </p>
+                    <p className="mt-0.5 text-xs text-ink/50">
+                      {formatBytes(it.size)}
+                      {/* [COST-DEBUG] ★本番前に削除★ */}
+                      {it.usage && (
+                        <span className="ml-2 text-ink/45">
+                          AI費用 {formatJpyCost(it.usage.estimatedCostJpy)}（入力
+                          {it.usage.inputTokens.toLocaleString()}／出力
+                          {it.usage.outputTokens.toLocaleString()}トークン）
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {it.status === "extracting" ? (
+                    <ExtractingProgress />
+                  ) : (
+                    <StatusBadge status={it.status} />
+                  )}
                 </div>
-                {it.status === "extracting" ? (
-                  <ExtractingProgress />
-                ) : (
-                  <StatusBadge status={it.status} />
+
+                {/* 変換後：AIが読み取った内容と正式名称 */}
+                {it.result && it.status !== "extracting" && (
+                  <ConversionResult result={it.result} />
                 )}
               </div>
             ))}
@@ -295,6 +318,52 @@ export function Dropzone() {
         </div>
       )}
     </div>
+  );
+}
+
+/** 変換後の内容を表示。AIが何を読み取り、どんな正式名称にしたかがその場で分かる。 */
+function ConversionResult({ result }: { result: DocumentRecord }) {
+  const newName = result.fileName ?? displayName(result);
+  const stored = result.status === "stored";
+  return (
+    <div className="mt-2.5 rounded-xl border border-black/[0.06] bg-background-soft p-3 pl-3.5 sm:ml-12">
+      {/* 変換後のファイル名 */}
+      <div className="flex items-start gap-1.5">
+        <IconArrowNarrowRight
+          size={16}
+          stroke={2}
+          className="mt-0.5 shrink-0 text-mint"
+        />
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium text-ink/45">
+            {stored ? "この名前で保存しました" : "AIの読み取り（要確認）"}
+          </p>
+          <p className="mt-0.5 break-all font-mono text-[13px] font-bold text-ink">
+            {newName}
+          </p>
+        </div>
+      </div>
+
+      {/* 読み取った項目 */}
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <Chip label="取引先" value={result.partnerName ?? "—"} />
+        <Chip label="税込" value={formatYen(result.amountInclTax)} />
+        <Chip label="日付" value={formatDateJp(result.transactionDate)} />
+        <Chip label="種別" value={docTypeLabel(result.documentType)} />
+        {result.registrationNumber && (
+          <Chip label="登録番号" value={result.registrationNumber} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Chip({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] ring-1 ring-black/[0.06]">
+      <span className="text-ink/40">{label}</span>
+      <span className="font-medium text-ink/80">{value}</span>
+    </span>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   IconCloudUpload,
@@ -47,8 +47,14 @@ export function Dropzone() {
   const { processUpload } = useDocuments();
   const [dragOver, setDragOver] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  // 二重投函チェック用に最新の投函リストを参照（イベントのクロージャ陳腐化を回避）
+  const itemsRef = useRef<Item[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const MAX_INLINE_BYTES = 15 * 1024 * 1024; // 15MB超は本体を送らない
 
@@ -97,7 +103,25 @@ export function Dropzone() {
 
   function addFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((f) => handleFile(f));
+    // 同名・同サイズのファイルが既に投函リストにあれば二重投函を防ぐ
+    const seen = new Set(itemsRef.current.map((i) => `${i.name}__${i.size}`));
+    const fresh: File[] = [];
+    const skipped: string[] = [];
+    for (const f of Array.from(files)) {
+      const k = `${f.name}__${f.size}`;
+      if (seen.has(k)) {
+        skipped.push(f.name);
+        continue;
+      }
+      seen.add(k);
+      fresh.push(f);
+    }
+    setNotice(
+      skipped.length > 0
+        ? `「${skipped[0]}」は既に投函済みのため追加しませんでした（二重投函の防止）。`
+        : null,
+    );
+    fresh.forEach((f) => handleFile(f));
   }
 
   // 同じファイルを続けて選び直しても onChange が発火するよう value をリセット
@@ -165,6 +189,13 @@ export function Dropzone() {
           onChange={onPick}
         />
       </div>
+
+      {/* 二重投函の注意 */}
+      {notice && (
+        <div className="rounded-xl border border-amber/30 bg-amber-50 px-4 py-2.5 text-sm text-ink/70">
+          {notice}
+        </div>
+      )}
 
       {/* 補助アクション */}
       <div className="flex flex-wrap gap-3">

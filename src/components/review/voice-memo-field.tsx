@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IconMicrophone, IconPlayerStopFilled } from "@tabler/icons-react";
+import {
+  IconMicrophone,
+  IconPlayerStopFilled,
+  IconSparkles,
+  IconLoader2,
+} from "@tabler/icons-react";
 
 // Web Speech API の最小型（ブラウザ標準型が無い環境向け）
 type RecognitionAlternative = { transcript: string };
@@ -47,6 +52,7 @@ export function VoiceMemoField({
 }) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
+  const [formatting, setFormatting] = useState(false);
   const recRef = useRef<Recognition | null>(null);
   const baseRef = useRef("");
 
@@ -85,36 +91,78 @@ export function VoiceMemoField({
     setListening(true);
   }
 
+  async function formatWithAI() {
+    if (!value.trim() || formatting) return;
+    setFormatting(true);
+    try {
+      const res = await fetch("/api/format-memo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: value }),
+      });
+      if (res.ok) {
+        const json = (await res.json()) as { memo?: string };
+        if (json.memo) onChange(json.memo);
+      }
+    } catch {
+      /* 失敗時は元のまま */
+    } finally {
+      setFormatting(false);
+    }
+  }
+
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between gap-2">
         <label className="text-xs font-medium text-ink/70">
           メモ<span className="ml-1 text-ink/40">任意</span>
         </label>
-        {supported && (
-          <button
-            type="button"
-            onClick={toggle}
-            className={[
-              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
-              listening
-                ? "bg-coral text-white"
-                : "bg-coral-50 text-coral hover:bg-coral-50/70",
-            ].join(" ")}
-          >
-            {listening ? (
-              <>
-                <IconPlayerStopFilled size={12} />
-                停止
-              </>
-            ) : (
-              <>
-                <IconMicrophone size={12} />
-                音声で入力
-              </>
-            )}
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {value.trim() && (
+            <button
+              type="button"
+              onClick={formatWithAI}
+              disabled={formatting}
+              className="inline-flex items-center gap-1 rounded-full bg-mint-50 px-2.5 py-1 text-[11px] font-medium text-mint transition-colors hover:bg-mint-50/70 disabled:opacity-50"
+            >
+              {formatting ? (
+                <>
+                  <IconLoader2 size={12} className="animate-spin" />
+                  整形中…
+                </>
+              ) : (
+                <>
+                  <IconSparkles size={12} />
+                  AIで整形
+                </>
+              )}
+            </button>
+          )}
+          {supported && (
+            <button
+              type="button"
+              onClick={toggle}
+              className={[
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                listening
+                  ? "bg-coral text-white"
+                  : "bg-coral-50 text-coral hover:bg-coral-50/70",
+              ].join(" ")}
+            >
+              {listening ? (
+                <>
+                  <IconPlayerStopFilled size={12} />
+                  停止
+                </>
+              ) : (
+                <>
+                  <IconMicrophone size={12} />
+                  音声で入力
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
       <textarea
         value={value}

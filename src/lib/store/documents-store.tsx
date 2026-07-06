@@ -161,6 +161,15 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [realMode, status, refetch]);
 
+  // ── 本番: 抽出中の証憑がある間はバックグラウンドで自動更新 ──
+  // （投函画面を離れて戻っても、処理中→完了が反映される）
+  const hasExtracting = documents.some((d) => d.status === "extracting");
+  useEffect(() => {
+    if (!realMode || status !== "authed" || !hasExtracting) return;
+    const id = setInterval(() => refetch(), 5000);
+    return () => clearInterval(id);
+  }, [realMode, status, hasExtracting, refetch]);
+
   // ── デモ: localStorageへ保存 ──
   useEffect(() => {
     if (realMode || !loaded.current) return;

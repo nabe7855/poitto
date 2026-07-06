@@ -71,8 +71,6 @@ interface StoreValue {
 
 const StoreContext = createContext<StoreValue | null>(null);
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 let idCounter = 0;
 function newId(prefix: string): string {
   idCounter += 1;
@@ -214,14 +212,10 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
             body: base64ToBlob(file.data, file.type || "application/pdf"),
           });
         }
+        // アップロード完了。抽出の完了待ちはここではしない
+        // （ストアの自動更新＋「処理状況」リストで順次追跡する）。
+        // これにより大量投函でもS3へ素早く投入でき、詰まり・タイムアウトを防ぐ。
         await refetch();
-        // S3→SQS→Lambda(Gemini)の非同期抽出をポーリング
-        for (let i = 0; i < 12; i++) {
-          await sleep(3000);
-          await refetch();
-          const d = docsRef.current.find((x) => x.id === id);
-          if (d && d.status !== "extracting") return d;
-        }
         return (
           docsRef.current.find((x) => x.id === id) ?? {
             id,

@@ -32,12 +32,32 @@ type Item = {
   key: string;
   name: string;
   size: number;
-  status: DocStatus;
+  status: DocStatus; // 投函直後のフォールバック表示用（確定後はストアの最新を優先）
+  docId?: string; // 対応するストア(サーバー)上の証憑ID
   usage?: ExtractionUsage; // [COST-DEBUG] ★本番前に削除★
   result?: DocumentRecord; // 抽出・変換の結果（保存済み/要確認の内容表示用）
 };
 
 let counter = 0;
+
+/** 同時実行数を limit に制限して順番に処理する（大量投函でも詰まらせない） */
+async function runPool<T>(
+  list: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let idx = 0;
+  const runners = Array.from(
+    { length: Math.min(limit, list.length) },
+    async () => {
+      while (idx < list.length) {
+        const cur = list[idx++];
+        await worker(cur);
+      }
+    },
+  );
+  await Promise.all(runners);
+}
 
 /** File を base64 文字列（data URLプレフィックス除去）に変換 */
 function fileToBase64(file: File): Promise<string> {
@@ -58,7 +78,7 @@ function fileToBase64(file: File): Promise<string> {
  * 命名・月別保存 or 要確認へ振り分けてストアに反映する。
  */
 export function Dropzone() {
-  const { processUpload } = useDocuments();
+  const { processUpload, documents } = useDocuments();
   const [dragOver, setDragOver] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -72,19 +92,33 @@ export function Dropzone() {
 
   const MAX_INLINE_BYTES = 15 * 1024 * 1024; // 15MB超は本体を送らない
 
+  // 各投函アイテムにストア(サーバー)の最新状態を突き合わせる。
+  // これにより、投函後に完了したものが自動でこの一覧にも反映される。
+  const rows = items.map((it) => {
+    const live = it.docId
+      ? documents.find((d) => d.id === it.docId)
+      : undefined;
+    return {
+      it,
+      status: live?.status ?? it.status,
+      result: live ?? it.result,
+      usage: live?.usage ?? it.usage,
+    };
+  });
+
   // [COST-DEBUG] セッション合計（★本番前に削除★）
-  const usedItems = items.filter((i) => i.usage);
-  const totalCostCount = usedItems.length;
-  const totalCost = usedItems.reduce(
-    (s, i) => s + (i.usage?.estimatedCostJpy ?? 0),
+  const usedRows = rows.filter((r) => r.usage);
+  const totalCostCount = usedRows.length;
+  const totalCost = usedRows.reduce(
+    (s, r) => s + (r.usage?.estimatedCostJpy ?? 0),
     0,
   );
-  const totalInput = usedItems.reduce(
-    (s, i) => s + (i.usage?.inputTokens ?? 0),
+  const totalInput = usedRows.reduce(
+    (s, r) => s + (r.usage?.inputTokens ?? 0),
     0,
   );
-  const totalOutput = usedItems.reduce(
-    (s, i) => s + (i.usage?.outputTokens ?? 0),
+  const totalOutput = usedRows.reduce(
+    (s, r) => s + (r.usage?.outputTokens ?? 0),
     0,
   );
 
@@ -103,7 +137,7 @@ export function Dropzone() {
     setItems((prev) =>
       prev.map((p) =>
         p.key === key
-          ? { ...p, status: doc.status, usage: doc.usage, result: doc }
+          ? { ...p, docId: doc.id, status: doc.status, usage: doc.usage, result: doc }
           : p,
       ),
     );
@@ -137,7 +171,8 @@ export function Dropzone() {
         ? `「${skipped[0]}」は既に投函済みのため追加しませんでした（二重投函の防止）。`
         : null,
     );
-    fresh.forEach((f) => handleFile(f));
+    // 一度に大量投函されても、同時アップロードは3件までに絞って順番に処理する
+    void runPool(fresh, 3, handleFile);
   }
 
   // 同じファイルを続けて選び直しても onChange が発火するよう value をリセット
@@ -246,7 +281,7 @@ export function Dropzone() {
         <div>
           <h2 className="mb-3 text-sm font-bold text-ink">投函したファイル</h2>
           <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl border border-black/[0.06] bg-white">
-            {items.map((it) => (
+            {rows.map(({ it, status, result, usage }) => (
               <div key={it.key} className="px-4 py-3">
                 <div className="flex items-center gap-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-coral-50 text-coral">
@@ -259,25 +294,25 @@ export function Dropzone() {
                     <p className="mt-0.5 text-xs text-ink/50">
                       {formatBytes(it.size)}
                       {/* [COST-DEBUG] ★本番前に削除★ */}
-                      {it.usage && (
+                      {usage && (
                         <span className="ml-2 text-ink/45">
-                          AI費用 {formatJpyCost(it.usage.estimatedCostJpy)}（入力
-                          {it.usage.inputTokens.toLocaleString()}／出力
-                          {it.usage.outputTokens.toLocaleString()}トークン）
+                          AI費用 {formatJpyCost(usage.estimatedCostJpy)}（入力
+                          {usage.inputTokens.toLocaleString()}／出力
+                          {usage.outputTokens.toLocaleString()}トークン）
                         </span>
                       )}
                     </p>
                   </div>
-                  {it.status === "extracting" ? (
+                  {status === "extracting" ? (
                     <ExtractingProgress />
                   ) : (
-                    <StatusBadge status={it.status} />
+                    <StatusBadge status={status} />
                   )}
                 </div>
 
                 {/* 変換後：AIが読み取った内容と正式名称 */}
-                {it.result && it.status !== "extracting" && (
-                  <ConversionResult result={it.result} />
+                {result && status !== "extracting" && (
+                  <ConversionResult result={result} />
                 )}
               </div>
             ))}

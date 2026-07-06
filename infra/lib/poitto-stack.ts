@@ -165,8 +165,13 @@ export class PoittoStack extends Stack {
       memorySize: 512,
       environment: commonEnv,
     });
+    // maxConcurrency: 一度に大量投函されても、同時に走るワーカーは最大2件に制限。
+    // 残りはSQSに積まれて順番に処理される（Geminiのレート制限で失敗しない）。
     extractWorker.addEventSource(
-      new eventsources.SqsEventSource(extractionQueue, { batchSize: 1 }),
+      new eventsources.SqsEventSource(extractionQueue, {
+        batchSize: 1,
+        maxConcurrency: 2,
+      }),
     );
 
     // ── Lambda: API ハンドラ（documents CRUD/検索）──

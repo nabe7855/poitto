@@ -5,6 +5,7 @@ import {
   IconX,
   IconFileText,
   IconDownload,
+  IconEye,
   IconFileTypeCsv,
   IconDeviceFloppy,
   IconTrash,
@@ -20,6 +21,7 @@ import {
 import { StatusBadge } from "@/components/ui/badges";
 import { VoiceMemoField } from "@/components/review/voice-memo-field";
 import { TagEditor } from "@/components/documents/tag-editor";
+import { DocumentPreview } from "@/components/documents/document-preview";
 import { useDocuments } from "@/lib/store/documents-store";
 import { duplicatesOf } from "@/lib/duplicates";
 import { documentsToCsv, csvWithBom } from "@/lib/csv";
@@ -41,6 +43,7 @@ export function DocumentDetail({
   const [downloading, setDownloading] = useState(false);
   const [dlError, setDlError] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   async function onDelete() {
     if (
@@ -199,9 +202,17 @@ export function DocumentDetail({
         <div className="space-y-2 border-t border-black/[0.06] p-4">
           <button
             type="button"
+            onClick={() => setPreviewing(true)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mint px-4 py-2.5 text-sm font-bold text-white transition-colors hover:brightness-95"
+          >
+            <IconEye size={16} stroke={2} />
+            原本をプレビュー
+          </button>
+          <button
+            type="button"
             onClick={downloadOriginal}
             disabled={downloading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mint px-4 py-2.5 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-mint/40 bg-white px-4 py-2.5 text-sm font-medium text-mint transition-colors hover:bg-mint-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <IconDownload size={16} stroke={2} />
             {downloading ? "取得中…" : "原本をダウンロード"}
@@ -230,6 +241,10 @@ export function DocumentDetail({
           </button>
         </div>
       </div>
+
+      {previewing && (
+        <DocumentPreview doc={doc} onClose={() => setPreviewing(false)} />
+      )}
     </div>
   );
 }

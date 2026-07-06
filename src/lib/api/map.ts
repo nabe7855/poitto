@@ -68,6 +68,8 @@ export function mapApiDoc(row: ApiRow): DocumentRecord {
     fileName: (row.file_name as string) ?? null,
     storedPath: (row.stored_path as string) ?? null,
     memo: (row.memo as string) ?? null,
+    department: (row.department as string) ?? null,
+    account: (row.account as string) ?? null,
     usage, // [COST-DEBUG] ★本番前に削除★
     mimeType: (row.mime_type as string) ?? "application/pdf",
     sizeBytes: num(row.size_bytes) ?? 0,

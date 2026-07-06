@@ -61,6 +61,8 @@ export interface SearchFilters {
   partner?: string;
   type?: DocType | "all";
   status?: DocStatus | "all";
+  department?: string; // 部分一致
+  account?: string; // "all" もしくは科目名（完全一致）
 }
 
 export function filterDocuments(
@@ -69,7 +71,8 @@ export function filterDocuments(
 ): DocumentRecord[] {
   return docs
     .filter((d) => {
-      const { from, to, amountMin, amountMax, partner, type, status } = filters;
+      const { from, to, amountMin, amountMax, partner, type, status, department, account } =
+        filters;
       if (from && (!d.transactionDate || d.transactionDate < from)) return false;
       if (to && (!d.transactionDate || d.transactionDate > to)) return false;
       if (amountMin != null && (d.amountInclTax ?? -1) < amountMin) return false;
@@ -77,6 +80,8 @@ export function filterDocuments(
       if (partner && !(d.partnerName ?? "").includes(partner)) return false;
       if (type && type !== "all" && d.documentType !== type) return false;
       if (status && status !== "all" && d.status !== status) return false;
+      if (department && !(d.department ?? "").includes(department)) return false;
+      if (account && account !== "all" && d.account !== account) return false;
       return true;
     })
     .sort((a, b) => {

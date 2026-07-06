@@ -59,6 +59,9 @@ export interface DocumentRecord {
   storedPath: string | null;
   // 任意メモ（目的・相手・場所など。音声入力→AI整形で付与可）
   memo?: string | null;
+  // 分類タグ（部門＝事業/プロジェクト、科目＝勘定科目）
+  department?: string | null;
+  account?: string | null;
   usage?: ExtractionUsage; // [COST-DEBUG] ★本番前に削除★
   // 原本
   mimeType: string;

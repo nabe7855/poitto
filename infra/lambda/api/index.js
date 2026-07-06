@@ -64,10 +64,10 @@ exports.handler = async (event) => {
     if (routeKey === "POST /documents/{id}/restore" && event.pathParameters?.id) {
       return json(200, await restoreDocument(tenantId, event.pathParameters.id));
     }
-    // 確認キューでの確定
+    // 部分更新（確定・メモ・分類タグ など送られた項目だけ更新）
     if (method === "PATCH" && event.pathParameters?.id) {
       const body = JSON.parse(event.body || "{}");
-      return json(200, await confirmDocument(tenantId, event.pathParameters.id, body));
+      return json(200, await updateDocument(tenantId, event.pathParameters.id, body));
     }
     // ゴミ箱へ（ソフト削除）
     if (method === "DELETE" && event.pathParameters?.id) {
@@ -103,7 +103,7 @@ async function listDocuments(tenantId, q) {
     const rows = await exec(
       `select id::text as id, status, to_char(transaction_date,'YYYY-MM-DD') as transaction_date,
               partner_name, amount_incl_tax, document_type, registration_number,
-              file_name, stored_path, memo, model, overall_confidence,
+              file_name, stored_path, memo, department, account, model, overall_confidence,
               mime_type, size_bytes, extraction,
               to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') as uploaded_at
          from documents
@@ -156,37 +156,55 @@ async function getDocument(tenantId, id) {
   });
 }
 
-async function confirmDocument(tenantId, id, body) {
+// 部分更新: body に含まれる項目だけを更新する（メモ・分類タグ・確定などに共通）。
+// body.confirm=true のときは要確認→保存済みへ確定する。
+async function updateDocument(tenantId, id, body) {
+  // JSプロパティ名 → DB列名（許可リスト）
+  const COLS = {
+    transactionDate: "transaction_date",
+    partnerName: "partner_name",
+    amountInclTax: "amount_incl_tax",
+    documentType: "document_type",
+    registrationNumber: "registration_number",
+    fileName: "file_name",
+    storedPath: "stored_path",
+    memo: "memo",
+    department: "department",
+    account: "account",
+  };
+  const CAST = { transaction_date: "::date" };
+
   return withTenant(tenantId, async (exec) => {
+    const sets = [];
+    const params = { id };
+    for (const [key, col] of Object.entries(COLS)) {
+      if (Object.prototype.hasOwnProperty.call(body, key)) {
+        sets.push(`${col} = :${col}${CAST[col] || ""}`);
+        // 空文字は NULL 扱い。数値列は数値化。
+        let v = body[key];
+        if (v === "" || v === undefined) v = null;
+        if (col === "amount_incl_tax" && v != null) v = Number(v);
+        params[col] = v;
+      }
+    }
+    if (body.confirm) {
+      sets.push("status = 'stored'", "confirmed_at = now()");
+    }
+    if (sets.length === 0) return { ok: true };
+
     await exec(
-      `update documents set
-          status = 'stored',
-          transaction_date = :d::date,
-          partner_name = :p,
-          amount_incl_tax = :a,
-          document_type = :t,
-          registration_number = :r,
-          file_name = :fn,
-          stored_path = :sp,
-          memo = :memo,
-          confirmed_at = now()
-        where id = :id::uuid`,
-      {
-        id,
-        d: body.transactionDate,
-        p: body.partnerName,
-        a: Number(body.amountInclTax),
-        t: body.documentType,
-        r: body.registrationNumber || null,
-        fn: body.fileName || null,
-        sp: body.storedPath || null,
-        memo: body.memo || null,
-      },
+      `update documents set ${sets.join(", ")} where id = :id::uuid`,
+      params,
     );
     await exec(
       `insert into audit_logs (tenant_id, document_id, action, detail)
-       values (:tid::uuid, :id::uuid, 'confirm', :detail::jsonb)`,
-      { tid: tenantId, id, detail: JSON.stringify({ by: "user" }) },
+       values (:tid::uuid, :id::uuid, :action, :detail::jsonb)`,
+      {
+        tid: tenantId,
+        id,
+        action: body.confirm ? "confirm" : "update",
+        detail: JSON.stringify({ by: "user" }),
+      },
     );
     return { ok: true };
   });
@@ -231,7 +249,7 @@ async function listTrash(tenantId) {
     const rows = await exec(
       `select id::text as id, status, to_char(transaction_date,'YYYY-MM-DD') as transaction_date,
               partner_name, amount_incl_tax, document_type, registration_number,
-              file_name, stored_path, memo, model, overall_confidence,
+              file_name, stored_path, memo, department, account, model, overall_confidence,
               mime_type, size_bytes, extraction,
               to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') as uploaded_at
          from documents

@@ -7,6 +7,7 @@ import { filterDocuments, sumAmount, type SearchFilters } from "@/lib/selectors"
 import { useDocuments } from "@/lib/store/documents-store";
 import { DocumentList } from "@/components/documents/document-list";
 import { DOC_TYPE_LABEL, formatYen } from "@/lib/format";
+import { ACCOUNT_PRESETS } from "@/lib/tags";
 import {
   documentsToCsv,
   documentsToAccountingCsv,
@@ -35,6 +36,8 @@ const EMPTY: SearchFilters = {
   partner: "",
   type: "all",
   status: "all",
+  department: "",
+  account: "all",
 };
 
 export function SearchClient() {
@@ -53,10 +56,19 @@ export function SearchClient() {
         partner: f.partner || undefined,
         type: f.type,
         status: f.status,
+        department: f.department || undefined,
+        account: f.account,
       },
       documents,
     );
   }, [f, documents]);
+
+  // 科目の選択肢: プリセット ∪ 実際に使われている科目
+  const accountOptions = useMemo(() => {
+    const set = new Set<string>(ACCOUNT_PRESETS);
+    for (const d of documents) if (d.account) set.add(d.account);
+    return [...set];
+  }, [documents]);
 
   const total = sumAmount(results);
 
@@ -176,6 +188,39 @@ export function SearchClient() {
               {STATUS_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 部門（事業） */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/70">
+              部門（部分一致）
+            </label>
+            <input
+              type="text"
+              placeholder="例：こども食堂"
+              value={f.department ?? ""}
+              onChange={(e) => setF({ ...f, department: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+
+          {/* 科目（勘定科目） */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/70">
+              勘定科目
+            </label>
+            <select
+              value={f.account ?? "all"}
+              onChange={(e) => setF({ ...f, account: e.target.value })}
+              className={inputCls}
+            >
+              <option value="all">すべての科目</option>
+              {accountOptions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
                 </option>
               ))}
             </select>

@@ -63,6 +63,10 @@ interface StoreValue {
   /** 原本の実体を取得（デモ=当セッション、本番=S3署名URL経由）。無ければnull */
   getOriginalBlob: (id: string) => Promise<Blob | null>;
   setMemo: (id: string, memo: string) => void;
+  setTags: (
+    id: string,
+    tags: { department: string | null; account: string | null },
+  ) => void;
   deleteDocument: (id: string) => Promise<void>;
   restoreDocument: (id: string) => Promise<void>;
   getTrash: () => Promise<DocumentRecord[]>;
@@ -310,6 +314,7 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
             memo: draft.memo ?? null,
             fileName,
             storedPath: ym ? storedPathOf(ym) : null,
+            confirm: true, // 要確認→保存済みへ確定
           });
           await refetch();
         })();
@@ -330,25 +335,47 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
         (async () => {
           const token = await getIdToken();
           if (!token) return;
-          const d = docsRef.current.find((x) => x.id === id);
-          if (!d) return;
-          const ym = monthKey(d.transactionDate);
-          await apiPatchDocument(token, id, {
-            transactionDate: d.transactionDate,
-            partnerName: d.partnerName,
-            amountInclTax: d.amountInclTax,
-            documentType: d.documentType,
-            registrationNumber: d.registrationNumber,
-            memo,
-            fileName: d.fileName,
-            storedPath: d.storedPath ?? (ym ? storedPathOf(ym) : null),
-          });
+          await apiPatchDocument(token, id, { memo });
           await refetch();
         })();
         return;
       }
       setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, memo } : d)));
       addLog({ documentId: id, action: "update", actor: "あなた", detail: "メモを更新" });
+    },
+    [realMode, getIdToken, refetch, addLog],
+  );
+
+  const setTags = useCallback(
+    (
+      id: string,
+      tags: { department: string | null; account: string | null },
+    ) => {
+      if (realMode) {
+        (async () => {
+          const token = await getIdToken();
+          if (!token) return;
+          await apiPatchDocument(token, id, {
+            department: tags.department,
+            account: tags.account,
+          });
+          await refetch();
+        })();
+        return;
+      }
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.id === id
+            ? { ...d, department: tags.department, account: tags.account }
+            : d,
+        ),
+      );
+      addLog({
+        documentId: id,
+        action: "update",
+        actor: "あなた",
+        detail: "部門・科目を更新",
+      });
     },
     [realMode, getIdToken, refetch, addLog],
   );
@@ -433,12 +460,13 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       getSessionFile,
       getOriginalBlob,
       setMemo,
+      setTags,
       deleteDocument,
       restoreDocument,
       getTrash,
       resetDemo,
     }),
-    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, deleteDocument, restoreDocument, getTrash, resetDemo],
+    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, setTags, deleteDocument, restoreDocument, getTrash, resetDemo],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

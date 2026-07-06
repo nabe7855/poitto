@@ -19,6 +19,7 @@ import {
 } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/badges";
 import { VoiceMemoField } from "@/components/review/voice-memo-field";
+import { TagEditor } from "@/components/documents/tag-editor";
 import { useDocuments } from "@/lib/store/documents-store";
 import { duplicatesOf } from "@/lib/duplicates";
 import { documentsToCsv, csvWithBom } from "@/lib/csv";
@@ -167,6 +168,12 @@ export function DocumentDetail({
               {doc.usage.model}）
             </div>
           )}
+
+          {/* 分類（部門・科目） */}
+          <div>
+            <p className="mb-1 text-xs font-medium text-ink/70">分類</p>
+            <TagEditor doc={doc} defaultOpen />
+          </div>
 
           {/* メモ（後付け編集可） */}
           <div className="rounded-xl border border-black/[0.06] bg-background-soft p-3">

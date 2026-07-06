@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-react";
 import { StatusBadge } from "@/components/ui/badges";
 import { VoiceMemoField } from "@/components/review/voice-memo-field";
+import { TagEditor } from "@/components/documents/tag-editor";
 import {
   formatBytes,
   displayName,
@@ -393,7 +394,8 @@ function ConversionResult({ result }: { result: DocumentRecord }) {
         )}
       </div>
 
-      {/* この場でメモを追加 */}
+      {/* その場で分類（部門・科目）とメモを追加 */}
+      <TagEditor doc={result} />
       <InlineMemo docId={result.id} initial={result.memo ?? ""} />
     </div>
   );

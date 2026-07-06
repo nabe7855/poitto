@@ -63,6 +63,20 @@ export function DocumentList({
                 </span>
               )}
             </p>
+            {(d.department || d.account) && (
+              <p className="mt-1 flex flex-wrap items-center gap-1">
+                {d.department && (
+                  <span className="inline-flex items-center rounded-md bg-mint-50 px-1.5 py-0.5 text-[11px] font-medium text-mint">
+                    {d.department}
+                  </span>
+                )}
+                {d.account && (
+                  <span className="inline-flex items-center rounded-md bg-black/[0.05] px-1.5 py-0.5 text-[11px] font-medium text-ink/70">
+                    {d.account}
+                  </span>
+                )}
+              </p>
+            )}
             {d.memo && (
               <p className="mt-1 flex items-start gap-1 text-xs text-ink/45">
                 <IconNote size={13} stroke={1.75} className="mt-0.5 shrink-0" />

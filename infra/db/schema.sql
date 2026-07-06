@@ -73,6 +73,11 @@ alter table documents add column if not exists memo text;
 -- ソフト削除（ゴミ箱）用。null=有効、非null=削除済み。電帳法の削除履歴のため原本は保持。
 alter table documents add column if not exists deleted_at timestamptz;
 create index if not exists idx_documents_tenant_deleted on documents (tenant_id, deleted_at);
+-- 分類タグ: 部門（事業/プロジェクト）・科目（勘定科目）
+alter table documents add column if not exists department text;
+alter table documents add column if not exists account text;
+create index if not exists idx_documents_tenant_department on documents (tenant_id, department);
+create index if not exists idx_documents_tenant_account    on documents (tenant_id, account);
 
 -- ============================================================
 -- 監査ログ

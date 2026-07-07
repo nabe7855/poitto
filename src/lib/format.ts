@@ -33,6 +33,31 @@ export function formatDateJp(iso: string | null): string {
   return `${y}年${m}月${d}日`;
 }
 
+/**
+ * APIの日時文字列を安全にDateへ。PostgreSQLのOF形式は末尾が "+09" のように
+ * 分が無く、そのままだと new Date が Invalid になるため "+09:00" に補正する。
+ */
+function parseApiDate(s: string): Date {
+  let d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d;
+  const m = s.match(/([+-]\d{2})$/);
+  if (m) d = new Date(s.replace(/([+-]\d{2})$/, `${m[1]}:00`));
+  return d;
+}
+
+/** ISO日時 → "6/30 14:05"（操作履歴などの表示用） */
+export function formatDateTimeJp(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = parseApiDate(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /** "YYYY-MM-DD" → "YYMMDD"（命名用） */
 export function toYymmdd(iso: string): string {
   const [y, m, d] = iso.split("-");

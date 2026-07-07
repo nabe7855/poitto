@@ -64,8 +64,15 @@ function normalizeName(s) {
     .toLowerCase();
 }
 
+// SQSのmaxReceiveCountと合わせる（この回数までは再試行、超えたらエラー確定）
+const MAX_RECEIVE = 3;
+
 exports.handler = async (event) => {
   for (const record of event.Records || []) {
+    // このメッセージが何回目の配信か（一時障害の再試行判定に使う）
+    const receiveCount = Number(
+      record.attributes?.ApproximateReceiveCount || 1,
+    );
     const body = JSON.parse(record.body);
     // S3通知（直接 or SNS経由）に対応
     const s3records = body.Records || [];
@@ -75,13 +82,13 @@ exports.handler = async (event) => {
       );
       const tenantId = tenantFromKey(key);
       if (!tenantId || !key) continue;
-      await processOne(tenantId, key);
+      await processOne(tenantId, key, receiveCount);
     }
   }
   return { ok: true };
 };
 
-async function processOne(tenantId, key) {
+async function processOne(tenantId, key, receiveCount = 1) {
   const bytes = await getBytes(key);
   const mimeType = key.endsWith(".pdf") ? "application/pdf" : "image/jpeg";
   const orgName = await tenantOrgName(tenantId);
@@ -89,6 +96,14 @@ async function processOne(tenantId, key) {
   try {
     extraction = await callGemini(bytes.toString("base64"), mimeType, orgName);
   } catch (err) {
+    // 一時障害（Gemini 503/429）は、まだ再試行の余地があればSQSへ戻して数分後に再挑戦。
+    // 例外を投げるとメッセージはキューに戻り、可視性タイムアウト後に再配信される。
+    if (err.retryable && receiveCount < MAX_RECEIVE) {
+      console.error(
+        `[extract-retry] key=${key} receive=${receiveCount} error=${err.message}`,
+      );
+      throw err;
+    }
     // どのファイルで・何が起きたかをCloudWatchに残す（診断用）
     console.error(`[extract-fail] key=${key} error=${err.message}`);
     await update(tenantId, key, { status: "error" }, `抽出失敗: ${err.message}`);
@@ -274,7 +289,10 @@ async function callGemini(base64, mimeType, orgName) {
       await sleep(1500 * 2 ** attempt); // 1.5s, 3s, 6s, 12s
       continue;
     }
-    throw new Error(`Gemini ${status}: ${errText}`);
+    const e = new Error(`Gemini ${status}: ${errText}`);
+    // 429/503 は一時障害。SQSで後ほど再試行させる。
+    if (status === 429 || status === 503) e.retryable = true;
+    throw e;
   }
   const j = await res.json();
   const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;

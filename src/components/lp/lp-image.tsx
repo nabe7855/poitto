@@ -17,6 +17,7 @@ export function LpImage({
   className = "",
   sizes = "(min-width: 768px) 50vw, 100vw",
   priority = false,
+  frame = false,
 }: {
   /** 例: "/lp/hero.png" */
   src: string;
@@ -28,6 +29,8 @@ export function LpImage({
   className?: string;
   sizes?: string;
   priority?: boolean;
+  /** スクリーンショット用の縁取り。画像が無いときは縁ごと消える */
+  frame?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -41,6 +44,11 @@ export function LpImage({
   }, []);
 
   if (failed) {
+    // 本番では何も出さない。プレースホルダは開発者向けの足場であって、
+    // 訪問者に「public/lp/ に置いてください」と見せるものではない。
+    // 画像が無いセクションは、絵の無い普通のセクションとして成立させる。
+    if (process.env.NODE_ENV !== "development") return null;
+
     return (
       <div
         style={{ aspectRatio: ratio }}
@@ -59,10 +67,10 @@ export function LpImage({
     );
   }
 
-  return (
+  const img = (
     <div
       style={{ aspectRatio: ratio }}
-      className={`relative overflow-hidden rounded-[16px] ${className}`}
+      className={`relative overflow-hidden rounded-[16px] ${frame ? "" : className}`}
     >
       <Image
         ref={imgRef}
@@ -74,6 +82,16 @@ export function LpImage({
         onError={() => setFailed(true)}
         className="object-cover"
       />
+    </div>
+  );
+
+  if (!frame) return img;
+
+  return (
+    <div
+      className={`rounded-[18px] border border-black/[0.07] bg-[#faf8f5] p-2.5 ${className}`}
+    >
+      {img}
     </div>
   );
 }

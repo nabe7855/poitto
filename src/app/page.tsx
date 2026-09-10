@@ -366,14 +366,13 @@ function Steps() {
               <p className="mt-4 text-sm leading-[2] text-black/60">{s.body}</p>
             </div>
             <div className={`md:col-span-7 ${i % 2 === 1 ? "md:order-1" : ""}`}>
-              <div className="rounded-[18px] border border-black/[0.07] bg-[#faf8f5] p-2.5">
-                <LpImage
-                  src={s.shot}
-                  alt={s.title}
-                  ratio="16 / 10"
-                  note={s.shotNote}
-                />
-              </div>
+              <LpImage
+                src={s.shot}
+                alt={s.title}
+                ratio="16 / 10"
+                note={s.shotNote}
+                frame
+              />
             </div>
           </div>
         ))}

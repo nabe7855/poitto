@@ -902,7 +902,7 @@ function FinalCta() {
           <LpImage
             src="/lp/shelf.png"
             alt="12か月分のファイルがきれいに収まった棚のイラスト"
-            ratio="16 / 9"
+            ratio="4 / 3"
             note="12マスの棚にファイルが1冊ずつ収まっている絵"
           />
         </div>

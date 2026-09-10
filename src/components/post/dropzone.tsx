@@ -27,6 +27,7 @@ import type {
   ExtractionUsage,
 } from "@/lib/types";
 import { useDocuments } from "@/lib/store/documents-store";
+import { ROUTES } from "@/lib/routes";
 import { formatJpyCost } from "@/lib/ai-cost"; // [COST-DEBUG] ★本番前に削除★
 
 type Item = {
@@ -345,11 +346,11 @@ export function Dropzone() {
           )}
           <p className="mt-3 text-xs text-ink/45">
             保存済みは{" "}
-            <Link href="/months" className="font-medium text-coral hover:underline">
+            <Link href={ROUTES.months} className="font-medium text-coral hover:underline">
               月別一覧
             </Link>{" "}
             に、要確認は{" "}
-            <Link href="/review" className="font-medium text-coral hover:underline">
+            <Link href={ROUTES.review} className="font-medium text-coral hover:underline">
               確認キュー
             </Link>{" "}
             に振り分けられます。

@@ -9,7 +9,7 @@ import { MobileDrawer } from "./mobile-drawer";
 import { BottomNav } from "./nav-links";
 import { DocumentsProvider } from "@/lib/store/documents-store";
 import { useAuth } from "@/lib/auth/auth-context";
-import { AUTH_ROUTES } from "@/lib/auth/config";
+import { ROUTES, isAppRoute } from "@/lib/routes";
 
 /** サイドバー＋ヘッダーの共通レイアウト骨格（＋認証ゲート） */
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -17,17 +17,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { realMode, status } = useAuth();
-  const isAuthRoute = AUTH_ROUTES.includes(pathname);
+  // 共通シェルと認証ゲートの対象は `/app/*` だけ。
+  // LP（`/`）とログイン/登録は、シェルなしで素のまま表示する。
+  const inApp = isAppRoute(pathname);
 
   // 本番モードで未ログインならログイン画面へ
   useEffect(() => {
-    if (realMode && !isAuthRoute && status === "guest") {
-      router.replace("/signin");
+    if (realMode && inApp && status === "guest") {
+      router.replace(ROUTES.signin);
     }
-  }, [realMode, isAuthRoute, status, router]);
+  }, [realMode, inApp, status, router]);
 
-  // ログイン/登録ページはシェルなしでそのまま表示
-  if (isAuthRoute) return <>{children}</>;
+  if (!inApp) return <>{children}</>;
 
   // 認証チェック中／未ログイン（遷移待ち）はローディング
   if (realMode && status !== "authed") {

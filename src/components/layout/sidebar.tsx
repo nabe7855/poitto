@@ -2,12 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { SidebarNav } from "./nav-links";
 
+import { ROUTES } from "@/lib/routes";
 /** デスクトップ用の固定サイドバー */
 export function Sidebar() {
   return (
     <aside className="hidden md:flex md:w-60 lg:w-64 shrink-0 flex-col border-r border-black/[0.06] bg-white">
       <div className="flex h-16 items-center px-5">
-        <Link href="/" className="inline-flex items-center" aria-label="ポイッと ホーム">
+        <Link href={ROUTES.home} className="inline-flex items-center" aria-label="ポイッと ホーム">
           <Image
             src="/brand/logo/poitto_logo_horizontal.png"
             alt="ポイッと POITTO"

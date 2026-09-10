@@ -5,6 +5,7 @@ import Link from "next/link";
 import { IconMenu2, IconMailbox, IconLogout } from "@tabler/icons-react";
 import { useAuth } from "@/lib/auth/auth-context";
 
+import { ROUTES } from "@/lib/routes";
 export function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const { realMode, status, signOut } = useAuth();
   return (
@@ -20,7 +21,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
       </button>
 
       {/* モバイル: ロゴ（デスクトップはサイドバーに表示） */}
-      <Link href="/" className="md:hidden" aria-label="ポイッと ホーム">
+      <Link href={ROUTES.home} className="md:hidden" aria-label="ポイッと ホーム">
         <Image
           src="/brand/logo/poitto_logo_horizontal.png"
           alt="ポイッと POITTO"
@@ -35,7 +36,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
 
       {/* 投函ショートカット */}
       <Link
-        href="/post"
+        href={ROUTES.post}
         className="inline-flex items-center gap-2 rounded-full bg-coral px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-coral-600"
       >
         <IconMailbox size={18} stroke={2} />

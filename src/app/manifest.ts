@@ -1,11 +1,14 @@
 import type { MetadataRoute } from "next";
+import { ROUTES } from "@/lib/routes";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "ポイッと（POITTO）",
     short_name: "ポイッと",
     description: "入れるだけで、証憑がかたづく。",
-    start_url: "/",
+    // ホーム画面から起動したときはアプリ本体を開く（`/` はLPなので）
+    start_url: ROUTES.home,
+    scope: "/",
     display: "standalone",
     background_color: "#faf8f5",
     theme_color: "#e8542b",

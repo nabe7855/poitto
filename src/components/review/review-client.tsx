@@ -139,7 +139,7 @@ function PreviewPane({ doc }: { doc: DocumentRecord }) {
           {doc.mimeType} ・ {formatBytes(doc.sizeBytes)}
         </p>
         <p className="mt-4 max-w-[220px] text-xs text-ink/35">
-          フェーズ4以降、PDF・画像の原本をここに表示します。
+          原本の中身は、証憑の詳細画面で確認できます。
         </p>
       </div>
     </div>

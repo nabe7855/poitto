@@ -7,6 +7,7 @@ import { IconUserPlus, IconMailCheck } from "@tabler/icons-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { AuthCard, authInputCls, authButtonCls } from "@/components/auth/auth-card";
 
+import { ROUTES } from "@/lib/routes";
 export default function SignUpPage() {
   const { signUp, confirm, resend, signIn } = useAuth();
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function SignUpPage() {
       await confirm(email.trim(), code.trim());
       // 認証後、そのままログインしてホームへ
       await signIn(email.trim(), password);
-      router.push("/");
+      router.push(ROUTES.home);
     } catch (err) {
       setError(toJa(err));
       setBusy(false);
@@ -91,7 +92,7 @@ export default function SignUpPage() {
       footer={
         <>
           すでにアカウントをお持ちの方は{" "}
-          <Link href="/signin" className="font-medium text-coral hover:underline">
+          <Link href={ROUTES.signin} className="font-medium text-coral hover:underline">
             ログイン
           </Link>
         </>

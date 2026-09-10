@@ -17,17 +17,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { realMode, status } = useAuth();
-  const isAuthRoute = AUTH_ROUTES.includes(pathname);
+  // ログイン/登録に加え、LP（紹介ページ）もアプリのシェル・認証ゲートの外に出す
+  const isBareRoute =
+    AUTH_ROUTES.includes(pathname) ||
+    pathname === "/lp" ||
+    pathname.startsWith("/lp/");
 
   // 本番モードで未ログインならログイン画面へ
   useEffect(() => {
-    if (realMode && !isAuthRoute && status === "guest") {
+    if (realMode && !isBareRoute && status === "guest") {
       router.replace("/signin");
     }
-  }, [realMode, isAuthRoute, status, router]);
+  }, [realMode, isBareRoute, status, router]);
 
-  // ログイン/登録ページはシェルなしでそのまま表示
-  if (isAuthRoute) return <>{children}</>;
+  // ログイン/登録ページとLPはシェルなしでそのまま表示
+  if (isBareRoute) return <>{children}</>;
 
   // 認証チェック中／未ログイン（遷移待ち）はローディング
   if (realMode && status !== "authed") {

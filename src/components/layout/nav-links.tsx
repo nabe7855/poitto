@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "./nav";
+import { ROUTES } from "@/lib/routes";
 import { useDocuments } from "@/lib/store/documents-store";
 
 function useReviewCount() {
@@ -11,7 +12,8 @@ function useReviewCount() {
 }
 
 function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
+  // ホーム（/app）は他の全ページの接頭辞なので、完全一致でしか光らせない
+  if (href === ROUTES.home) return pathname === ROUTES.home;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

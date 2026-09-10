@@ -10,11 +10,14 @@ LP用の画像置き場です。ChatGPTで生成した画像を、次の名前�
   mobile.png  3:2    レシートをスマホで撮影
   story.png   3:2    小さなNPO事務所の風景
 
+■ 自動生成（npm run shots で撮り直せる。手で置かない）
+  shot-post.png / shot-review.png / shot-months.png  … 使い方3ステップで使用
+  shot-search.png                                    … 予備（現在は未使用）
+
 ■ まだ未配置
   shelf.png   16:9   12マスの棚
   secure.png  1:1    リボンで結ばれた書類の束
   ogp.png     1200x630  SNSシェア用
-  shot-post.png / shot-review.png / shot-months.png  … 実画面のスクリーンショット
 
 プロンプトは docs/LP構成_画像プロンプト.md にあります。
 

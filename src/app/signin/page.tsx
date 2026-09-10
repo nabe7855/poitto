@@ -7,6 +7,7 @@ import { IconLogin2 } from "@tabler/icons-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { AuthCard, authInputCls, authButtonCls } from "@/components/auth/auth-card";
 
+import { ROUTES } from "@/lib/routes";
 export default function SignInPage() {
   const { signIn } = useAuth();
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function SignInPage() {
     setBusy(true);
     try {
       await signIn(email.trim(), password);
-      router.push("/");
+      router.push(ROUTES.home);
     } catch (err) {
       setError(toJa(err));
       setBusy(false);
@@ -35,7 +36,7 @@ export default function SignInPage() {
       footer={
         <>
           アカウントをお持ちでない方は{" "}
-          <Link href="/signup" className="font-medium text-coral hover:underline">
+          <Link href={ROUTES.signup} className="font-medium text-coral hover:underline">
             新規登録
           </Link>
         </>

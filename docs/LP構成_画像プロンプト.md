@@ -1,6 +1,16 @@
 # ポイっと LP：セクション構成と画像プロンプト
 
-実装：`/lp`（`src/app/lp/page.tsx`）。画像は `public/lp/` に決まったファイル名で置くと自動で差し替わります（置くまではダッシュ枠のプレースホルダが表示されます）。
+実装：`/`（`src/app/page.tsx`）。画像は `public/lp/` に決まったファイル名で置くと自動で差し替わります（置くまではダッシュ枠のプレースホルダが表示されます）。
+
+### URL構成
+
+| URL | 中身 | 公開 |
+|---|---|---|
+| `/` | 紹介ページ（LP） | 誰でも |
+| `/app`, `/app/post` など | アプリ本体 | 本番モードはログイン必須 |
+| `/signin`, `/signup` | 認証画面 | 誰でも |
+
+URLの定義は `src/lib/routes.ts` に一本化してあります。旧URL（`/post` など、`/lp`）は `next.config.ts` で新URLへ転送しています。
 
 ---
 
@@ -268,5 +278,4 @@ public/lp/shot-search.png   … 実画面：検索
 - 料金（現在は「準備中」表示）
 - CTAのリンク先（現在は `/signup` と `/post`）
 - プライバシーポリシー・利用規約のURL
-- OGP画像を正しく配信するための `metadataBase`（`src/app/layout.tsx`。公開ドメインが決まったら設定）
-- LPを `/` にするかどうか（現在は `/lp`。`/` はアプリのダッシュボード）
+- 公開ドメイン（`NEXT_PUBLIC_SITE_URL`）。OGP画像の絶対URL・`robots.txt`・`sitemap.xml` がこれを見ます

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { IconX } from "@tabler/icons-react";
 import { SidebarNav } from "./nav-links";
 
+import { ROUTES } from "@/lib/routes";
 export function MobileDrawer({
   open,
   onClose,
@@ -35,7 +36,7 @@ export function MobileDrawer({
         }`}
       >
         <div className="flex h-14 items-center justify-between px-4">
-          <Link href="/" onClick={onClose} aria-label="ポイッと ホーム">
+          <Link href={ROUTES.home} onClick={onClose} aria-label="ポイッと ホーム">
             <Image
               src="/brand/logo/poitto_logo_horizontal.png"
               alt="ポイッと POITTO"

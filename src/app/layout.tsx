@@ -3,8 +3,10 @@ import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { AuthProvider } from "@/lib/auth/auth-context";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "ポイッと（POITTO）",
     template: "%s｜ポイッと",

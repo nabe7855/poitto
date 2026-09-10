@@ -13,5 +13,3 @@ export function isRealMode(): boolean {
   return Boolean(API_URL && USER_POOL_ID && USER_POOL_CLIENT_ID);
 }
 
-/** 認証不要のルート */
-export const AUTH_ROUTES = ["/signin", "/signup"];

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { isRealMode } from "@/lib/auth/config";
+import { ROUTES } from "@/lib/routes";
 
 /* =========================================================================
    LPの「まだ決まっていない値」はここに集約。確定したら書き換える。
@@ -8,12 +10,29 @@ export const LP_CONFIG = {
   orgName: "NPO法人とちぎユース",
   /** TODO: 問い合わせ先メールに差し替え */
   contactEmail: "",
-  /** CTAのリンク先 */
-  ctaPrimary: { href: "/signup", label: "アカウントをつくる" },
-  ctaSecondary: { href: "/post", label: "デモをさわってみる" },
   /** TODO: 料金が決まったら pricing セクションを書き換え */
   pricingReady: false,
 } as const;
+
+/**
+ * CTAの文言とリンク先。
+ * 本番モード（AWS接続あり）は新規登録／ログイン。
+ * デモモード（AWS未接続）はサインアップが動かないので、アプリ本体へ直接誘導する。
+ * ※ isRealMode() は NEXT_PUBLIC_* から決まるのでサーバー／クライアントで同じ値になる。
+ */
+export const CTA = isRealMode()
+  ? {
+      realMode: true,
+      primary: { href: ROUTES.signup, label: "アカウントをつくる" },
+      secondary: { href: ROUTES.signin, label: "ログイン" },
+      headerLabel: "はじめる",
+    }
+  : {
+      realMode: false,
+      primary: { href: ROUTES.home, label: "デモをさわってみる" },
+      secondary: { href: "#features", label: "できることを見る" },
+      headerLabel: "さわってみる",
+    };
 
 /* ---------------------------------------------------------------- レイアウト */
 
@@ -107,8 +126,8 @@ export function Lead({
 /* ---------------------------------------------------------------------- CTA */
 
 export function PrimaryCta({
-  href = LP_CONFIG.ctaPrimary.href,
-  children = LP_CONFIG.ctaPrimary.label,
+  href = CTA.primary.href,
+  children = CTA.primary.label,
   className = "",
 }: {
   href?: string;
@@ -126,8 +145,8 @@ export function PrimaryCta({
 }
 
 export function SecondaryCta({
-  href = LP_CONFIG.ctaSecondary.href,
-  children = LP_CONFIG.ctaSecondary.label,
+  href = CTA.secondary.href,
+  children = CTA.secondary.label,
   invert = false,
   className = "",
 }: {

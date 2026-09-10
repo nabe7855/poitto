@@ -9,7 +9,7 @@ import { MobileDrawer } from "./mobile-drawer";
 import { BottomNav } from "./nav-links";
 import { DocumentsProvider } from "@/lib/store/documents-store";
 import { useAuth } from "@/lib/auth/auth-context";
-import { AUTH_ROUTES } from "@/lib/auth/config";
+import { ROUTES, isAppRoute } from "@/lib/routes";
 
 /** サイドバー＋ヘッダーの共通レイアウト骨格（＋認証ゲート） */
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -17,21 +17,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { realMode, status } = useAuth();
-  // ログイン/登録に加え、LP（紹介ページ）もアプリのシェル・認証ゲートの外に出す
-  const isBareRoute =
-    AUTH_ROUTES.includes(pathname) ||
-    pathname === "/lp" ||
-    pathname.startsWith("/lp/");
+  // 共通シェルと認証ゲートの対象は `/app/*` だけ。
+  // LP（`/`）とログイン/登録は、シェルなしで素のまま表示する。
+  const inApp = isAppRoute(pathname);
 
   // 本番モードで未ログインならログイン画面へ
   useEffect(() => {
-    if (realMode && !isBareRoute && status === "guest") {
-      router.replace("/signin");
+    if (realMode && inApp && status === "guest") {
+      router.replace(ROUTES.signin);
     }
-  }, [realMode, isBareRoute, status, router]);
+  }, [realMode, inApp, status, router]);
 
-  // ログイン/登録ページとLPはシェルなしでそのまま表示
-  if (isBareRoute) return <>{children}</>;
+  if (!inApp) return <>{children}</>;
 
   // 認証チェック中／未ログイン（遷移待ち）はローディング
   if (realMode && status !== "authed") {

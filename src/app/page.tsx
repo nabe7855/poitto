@@ -169,7 +169,7 @@ function Hero() {
           <LpImage
             src="/lp/hero.png"
             alt="投函ポストに書類がすべり込んでいくイラスト"
-            ratio="16 / 9"
+            ratio="4 / 3"
             priority
             note="コーラル色の投函ポストに、書類が1枚すべり込んでいく絵"
           />

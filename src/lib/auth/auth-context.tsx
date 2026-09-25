@@ -95,8 +95,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(async (e: string, p: string) => {
     await configureAmplify();
-    const { signIn, fetchUserAttributes } = await import("aws-amplify/auth");
-    await signIn({ username: e, password: p });
+    const {
+      signIn,
+      signOut: amplifySignOut,
+      fetchUserAttributes,
+    } = await import("aws-amplify/auth");
+    let result;
+    try {
+      result = await signIn({ username: e, password: p });
+    } catch (err) {
+      // ブラウザに古いログイン情報が残っていると弾かれるので、消してから1回だけやり直す
+      if ((err as { name?: string })?.name === "UserAlreadyAuthenticatedException") {
+        await amplifySignOut().catch(() => {});
+        result = await signIn({ username: e, password: p });
+      } else {
+        throw err;
+      }
+    }
+    // 追加手順が必要な状態（未認証・要パスワード再設定など）を成功扱いにしない
+    const step = result?.nextStep?.signInStep;
+    if (step && step !== "DONE") {
+      const map: Record<string, string> = {
+        CONFIRM_SIGN_UP: "UserNotConfirmedException",
+        RESET_PASSWORD: "PasswordResetRequiredException",
+      };
+      const err = new Error(`sign-in step: ${step}`);
+      err.name = map[step] ?? `NextStep_${step}`;
+      throw err;
+    }
     const attrs = (await fetchUserAttributes().catch(() => ({}))) as Record<
       string,
       string | undefined

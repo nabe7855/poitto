@@ -1,13 +1,11 @@
 // 【読み取り専用】データの所在を確認する診断スクリプト。
-// DBへの書き込みは一切しない（SELECTのみ・トランザクションは必ずROLLBACKで終える）。
+// DBへの書き込みは一切しない（SELECTのみ）。
 // 使い方（CloudShell等）:
 //   export DB_CLUSTER_ARN=... DB_SECRET_ARN=... DB_NAME=poitto
 //   node db/diagnose.mjs
 import {
   RDSDataClient,
   ExecuteStatementCommand,
-  BeginTransactionCommand,
-  RollbackTransactionCommand,
 } from "@aws-sdk/client-rds-data";
 
 const resourceArn = process.env.DB_CLUSTER_ARN;
@@ -70,46 +68,31 @@ async function query(sql, parameters = [], transactionId) {
   return rows(res);
 }
 
-console.log("=== 組織（テナント）一覧 ===");
-const tenants = await query(
-  `select id::text as id, name, to_char(created_at,'YYYY-MM-DD HH24:MI') as created
-     from tenants order by created_at`,
+// 管理者接続ではRLSが素通りになるため、tenant_id で明示的に集計する（正確な組織別件数）
+console.log("=== 組織ごとの証憑件数（tenant_idで明示集計） ===");
+const byTenant = await query(
+  `select coalesce(t.name, '(組織名なし)') as name,
+          t.id::text as tid,
+          to_char(t.created_at,'YYYY-MM-DD HH24:MI') as created,
+          count(d.id) as total,
+          count(d.id) filter (where d.deleted_at is null) as active,
+          count(d.id) filter (where d.deleted_at is not null) as trashed,
+          to_char(max(d.uploaded_at),'YYYY-MM-DD HH24:MI') as last_upload
+     from tenants t
+     left join documents d on d.tenant_id = t.id
+    group by t.id, t.name, t.created_at
+    order by count(d.id) desc, t.created_at`,
 );
-if (tenants.length === 0) console.log("（テナントがありません）");
-
-for (const t of tenants) {
-  // 行レベルセキュリティのため、テナントごとにトランザクション内で参照する（必ずROLLBACK）
-  const { transactionId } = await send(
-    new BeginTransactionCommand({ resourceArn, secretArn, database }),
+for (const r of byTenant) {
+  console.log(
+    `■ ${r.name}\n  テナントID: ${r.tid}（作成 ${r.created}）\n` +
+      `  証憑 合計:${r.total}（有効:${r.active} ／ ゴミ箱:${r.trashed}）  最終投函: ${r.last_upload ?? "なし"}`,
   );
-  try {
-    await query(
-      "select set_config('app.tenant_id', :tid, true)",
-      [{ name: "tid", value: { stringValue: t.id } }],
-      transactionId,
-    );
-    const [s] = await query(
-      `select count(*) as total,
-              count(*) filter (where deleted_at is null) as active,
-              count(*) filter (where deleted_at is not null) as trashed,
-              count(*) filter (where status = 'stored' and deleted_at is null) as stored,
-              count(*) filter (where status = 'review' and deleted_at is null) as review,
-              count(*) filter (where status = 'error' and deleted_at is null) as error,
-              to_char(max(uploaded_at),'YYYY-MM-DD HH24:MI') as last_upload
-         from documents`,
-      [],
-      transactionId,
-    );
-    console.log(
-      `\n■ ${t.name}\n  テナントID: ${t.id}\n  作成: ${t.created}\n` +
-        `  証憑 合計:${s.total}（有効:${s.active} ／ ゴミ箱:${s.trashed}）` +
-        `  内訳 保存済み:${s.stored} 要確認:${s.review} エラー:${s.error}\n` +
-        `  最終投函: ${s.last_upload ?? "なし"}`,
-    );
-  } finally {
-    await send(
-      new RollbackTransactionCommand({ resourceArn, secretArn, transactionId }),
-    ).catch(() => {});
-  }
 }
+const [orphan] = await query(
+  `select count(*) as n from documents d
+    where not exists (select 1 from tenants t where t.id = d.tenant_id)`,
+);
+console.log(`\n（組織に紐づかない証憑: ${orphan.n} 件）`);
+
 console.log("\n✅ 診断完了（DBへの変更はありません）");

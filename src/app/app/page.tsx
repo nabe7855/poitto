@@ -13,16 +13,23 @@ import { DocumentList } from "@/components/documents/document-list";
 import { formatAmount } from "@/lib/format";
 import {
   DEMO_MONTH,
+  currentYm,
   documentsInMonth,
   sumAmount,
 } from "@/lib/selectors";
 import { useDocuments } from "@/lib/store/documents-store";
+import { isRealMode } from "@/lib/auth/config";
 
 import { ROUTES } from "@/lib/routes";
 export default function HomePage() {
-  const { documents } = useDocuments();
+  const { documents, loadState } = useDocuments();
+  const loading = loadState !== "ready";
 
-  const monthDocs = documentsInMonth(DEMO_MONTH, documents);
+  // 本番は「今月」、デモはデモデータの月
+  const ym = isRealMode() ? currentYm() : DEMO_MONTH;
+  const m = `${Number(ym.slice(5))}月`;
+
+  const monthDocs = documentsInMonth(ym, documents);
   const reviewCount = documents.filter((d) => d.status === "review").length;
   const extractingCount = documents.filter((d) => d.status === "extracting").length;
   const monthTotal = sumAmount(monthDocs);
@@ -31,38 +38,41 @@ export default function HomePage() {
     .sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1))
     .slice(0, 4);
 
+  // 読み込み中・失敗時は「0」と誤解させないよう「—」を表示
+  const v = (s: string) => (loading ? "—" : s);
+
   const summary = [
     {
-      label: "6月の投函",
-      value: String(monthDocs.length + reviewCount + extractingCount),
+      label: `${m}の投函`,
+      value: v(String(monthDocs.length + reviewCount + extractingCount)),
       unit: "件",
       icon: IconMailbox,
       tone: "coral",
-      href: "/months",
+      href: ROUTES.months,
     },
     {
       label: "要確認",
-      value: String(reviewCount),
+      value: v(String(reviewCount)),
       unit: "件",
       icon: IconAlertTriangle,
       tone: "amber",
-      href: "/review",
+      href: ROUTES.review,
     },
     {
-      label: "保存済み（6月）",
-      value: String(monthDocs.length),
+      label: `保存済み（${m}）`,
+      value: v(String(monthDocs.length)),
       unit: "件",
       icon: IconFileCheck,
       tone: "mint",
-      href: "/months",
+      href: ROUTES.months,
     },
     {
-      label: "6月の合計金額",
-      value: formatAmount(monthTotal),
+      label: `${m}の合計金額`,
+      value: v(formatAmount(monthTotal)),
       unit: "円",
       icon: IconCoin,
       tone: "ink",
-      href: "/search",
+      href: ROUTES.search,
     },
   ] as const;
 
@@ -142,7 +152,10 @@ export default function HomePage() {
             <IconArrowRight size={16} stroke={2} />
           </Link>
         </div>
-        <DocumentList documents={recent} />
+        <DocumentList
+          documents={recent}
+          emptyText={loading ? "読み込み中…" : "証憑がありません。"}
+        />
       </div>
     </>
   );

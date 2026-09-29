@@ -54,9 +54,15 @@ type UploadMeta = {
 
 export type SessionFile = { base64: string; mimeType: string };
 
+/** 一覧の読み込み状態（本番）。失敗を「0件」と誤表示しないために使う */
+export type LoadState = "loading" | "ready" | "error";
+
 interface StoreValue {
   documents: DocumentRecord[];
   auditLogs: AuditLog[];
+  loadState: LoadState;
+  /** 一覧を読み込み直す（失敗時の「再読み込み」ボタン用） */
+  reloadDocuments: () => void;
   processUpload: (file: UploadMeta) => Promise<DocumentRecord>;
   confirmDocument: (id: string, draft: ConfirmDraft) => void;
   getSessionFile: (id: string) => SessionFile | undefined;
@@ -125,27 +131,49 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     docsRef.current = documents;
   }, [documents]);
 
-  // ── 本番モード: APIから一覧取得 ──
-  const refetch = useCallback(async () => {
+  const [loadState, setLoadState] = useState<LoadState>(
+    realMode ? "loading" : "ready",
+  );
+  const loadSeq = useRef(0);
+
+  // ── 本番モード: APIから一覧取得（成功ならtrue） ──
+  const refetch = useCallback(async (): Promise<boolean> => {
     try {
       const token = await getIdToken();
-      if (!token) return;
+      if (!token) return false;
       const rows = await apiListDocuments(token);
       setDocuments(rows.map(mapApiDoc));
       // 操作履歴も更新（設定画面の履歴表示用）
       apiListAudit(token)
         .then((logs) => setAuditLogs(logs.map(mapApiAudit)))
         .catch(() => {});
+      return true;
     } catch {
-      /* 取得失敗は無視（次のポーリング/操作で再取得） */
+      return false;
     }
   }, [getIdToken]);
+
+  // ── 初回読み込み: DBの寝起き（数十秒）に備えて間隔を空けて再試行 ──
+  // 失敗しても「0件」とは表示せず、読み込み中→最終的にエラー表示にする。
+  const reloadDocuments = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    setLoadState("loading");
+    for (const wait of [0, 3000, 5000, 8000, 12000, 15000]) {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      if (seq !== loadSeq.current) return; // 新しい読み込みが始まったら中断
+      if (await refetch()) {
+        if (seq === loadSeq.current) setLoadState("ready");
+        return;
+      }
+    }
+    if (seq === loadSeq.current) setLoadState("error");
+  }, [refetch]);
 
   // ── 読み込み ──
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (realMode) {
-      if (status === "authed") refetch();
+      if (status === "authed") reloadDocuments();
       return;
     }
     // デモ: localStorage
@@ -161,7 +189,7 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     }
     loaded.current = true;
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [realMode, status, refetch]);
+  }, [realMode, status, reloadDocuments]);
 
   // ── 本番: 抽出中の証憑がある間はバックグラウンドで自動更新 ──
   // （投函画面を離れて戻っても、処理中→完了が反映される）
@@ -455,6 +483,8 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     () => ({
       documents,
       auditLogs,
+      loadState,
+      reloadDocuments,
       processUpload,
       confirmDocument,
       getSessionFile,
@@ -466,7 +496,7 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       getTrash,
       resetDemo,
     }),
-    [documents, auditLogs, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, setTags, deleteDocument, restoreDocument, getTrash, resetDemo],
+    [documents, auditLogs, loadState, reloadDocuments, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, setTags, deleteDocument, restoreDocument, getTrash, resetDemo],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

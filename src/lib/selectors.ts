@@ -5,6 +5,11 @@ import { monthKey } from "./format";
 /** デモの基準月（受入基準が2026年6月のため） */
 export const DEMO_MONTH = "2026-06";
 
+/** 今月（YYYY-MM） */
+export function currentYm(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /** 保存済みのみ（索引対象） */
 export function storedDocuments(docs = MOCK_DOCUMENTS): DocumentRecord[] {
   return docs.filter((d) => d.status === "stored");

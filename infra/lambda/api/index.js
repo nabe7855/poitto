@@ -2,7 +2,7 @@
 // ポイッと API ハンドラ（HTTP API + Cognito JWT）。
 // テナントはJWTのカスタム属性 custom:tenant_id から取得し、RLSへ渡す。
 
-const { withTenant, execOne } = require("../shared/db");
+const { withTenant, execOne, isResuming } = require("../shared/db");
 const { presignGet, presignPut } = require("../shared/storage");
 
 function json(statusCode, body) {
@@ -36,12 +36,12 @@ async function ensureTenant(tenantId, orgName) {
 exports.handler = async (event) => {
   const { tenantId, orgName } = identity(event);
   if (!tenantId) return json(401, { error: "not authenticated" });
-  await ensureTenant(tenantId, orgName);
 
   const method = event.requestContext?.http?.method;
   const routeKey = event.routeKey || `${method} ${event.rawPath}`;
 
   try {
+    await ensureTenant(tenantId, orgName);
     // 一覧・検索
     if (routeKey === "GET /documents") {
       const q = event.queryStringParameters || {};
@@ -84,6 +84,10 @@ exports.handler = async (event) => {
     return json(404, { error: "not found", routeKey });
   } catch (err) {
     console.error(err);
+    // DBの寝起き中は「一時的に利用不可」を返し、画面側で再試行させる
+    if (isResuming(err)) {
+      return json(503, { error: "database is resuming", retryable: true });
+    }
     return json(500, { error: err.message || "internal error" });
   }
 };

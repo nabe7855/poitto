@@ -16,14 +16,24 @@ const resourceArn = process.env.DB_CLUSTER_ARN;
 const secretArn = process.env.DB_SECRET_ARN;
 const database = process.env.DB_NAME || "poitto";
 
-/** Aurora Serverless v2 が 0 ACU から復帰する間、少し待って再試行する */
+/** DBが0 ACUから起動中（寝起き）であることを示すエラーか */
+function isResuming(err) {
+  const msg = `${(err && err.name) || ""} ${(err && err.message) || ""}`;
+  return /DatabaseResuming|resuming|not currently available|Communications link|starting/i.test(
+    msg,
+  );
+}
+
+/**
+ * Aurora Serverless v2 が 0 ACU から復帰する間、少し待って再試行する。
+ * 長期間アイドル後の復帰は時間がかかるため、Lambdaの制限時間内で最大限待つ。
+ */
 async function send(command) {
-  for (let attempt = 0; attempt < 10; attempt++) {
+  for (let attempt = 0; attempt < 11; attempt++) {
     try {
       return await client.send(command);
     } catch (err) {
-      const name = err && err.name;
-      if (name === "DatabaseResumingException" && attempt < 9) {
+      if (isResuming(err) && attempt < 10) {
         await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
@@ -127,4 +137,4 @@ async function execOne(sql, params) {
   return res.records.map((r) => rowToObject(meta, r));
 }
 
-module.exports = { withTenant, execOne };
+module.exports = { withTenant, execOne, isResuming };

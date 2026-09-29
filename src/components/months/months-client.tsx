@@ -14,26 +14,34 @@ import { DocumentList } from "@/components/documents/document-list";
 import { MonthCalendar } from "./month-calendar";
 import { formatYen, monthLabel, storedPathOf, formatDateJp } from "@/lib/format";
 import { useDocuments } from "@/lib/store/documents-store";
-import { DEMO_MONTH, documentsInMonth, monthSummaries } from "@/lib/selectors";
+import {
+  DEMO_MONTH,
+  currentYm,
+  documentsInMonth,
+  monthSummaries,
+} from "@/lib/selectors";
+import { isRealMode } from "@/lib/auth/config";
 import { downloadMonthZip } from "@/lib/month-download";
 
 export function MonthsClient() {
-  const { documents, getOriginalBlob } = useDocuments();
+  const { documents, getOriginalBlob, loadState } = useDocuments();
   const summaries = useMemo(() => monthSummaries(documents), [documents]);
   const [ym, setYm] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [view, setView] = useState<"list" | "calendar">("list");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  // 既定の月: 本番は今月（無ければデータのある最新月）、デモはデモデータの月
+  const preferredYm = isRealMode() ? currentYm() : DEMO_MONTH;
   const effectiveYm =
     ym && summaries.some((s) => s.ym === ym)
       ? ym
-      : (summaries.find((s) => s.ym === DEMO_MONTH)?.ym ?? summaries[0]?.ym ?? "");
+      : (summaries.find((s) => s.ym === preferredYm)?.ym ?? summaries[0]?.ym ?? "");
 
   if (summaries.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-black/10 bg-white px-6 py-12 text-center text-sm text-ink/50">
-        保存済みの証憑がまだありません。
+        {loadState === "ready" ? "保存済みの証憑がまだありません。" : "読み込み中…"}
       </div>
     );
   }

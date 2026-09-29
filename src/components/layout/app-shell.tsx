@@ -8,6 +8,7 @@ import { Header } from "./header";
 import { MobileDrawer } from "./mobile-drawer";
 import { BottomNav } from "./nav-links";
 import { DocumentsProvider } from "@/lib/store/documents-store";
+import { LoadStatusBanner } from "./load-status-banner";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ROUTES, isAppRoute } from "@/lib/routes";
 
@@ -55,7 +56,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Header onMenuClick={() => setDrawerOpen(true)} />
 
           <main className="flex-1 px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-8">
-            <div className="mx-auto w-full max-w-6xl">{children}</div>
+            <div className="mx-auto w-full max-w-6xl">
+              <LoadStatusBanner />
+              {children}
+            </div>
           </main>
         </div>
 

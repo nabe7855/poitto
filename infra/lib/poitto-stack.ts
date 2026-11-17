@@ -222,6 +222,7 @@ export class PoittoStack extends Stack {
         methods: [HttpMethod.GET, HttpMethod.PATCH, HttpMethod.DELETE],
       },
       { path: "/documents/{id}/restore", methods: [HttpMethod.POST] },
+      { path: "/payments/bulk", methods: [HttpMethod.POST] },
       { path: "/trash", methods: [HttpMethod.GET] },
       { path: "/audit", methods: [HttpMethod.GET] },
       { path: "/months/{ym}", methods: [HttpMethod.GET] },

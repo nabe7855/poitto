@@ -4,6 +4,12 @@ export type DocType = "invoice" | "receipt" | "quote" | "delivery" | "other";
 
 export type DocStatus = "extracting" | "review" | "stored" | "error";
 
+/** 支払状況（未設定=未確認。導入前からある証憑はこれ） */
+export type PaymentStatus = "unpaid" | "paid" | "not_applicable";
+
+/** 支払方法（振込／口座振替／カード／現金） */
+export type PaymentMethod = "transfer" | "debit" | "card" | "cash";
+
 /** 抽出フィールド（値＋確信度） */
 export interface ExtractedField<T> {
   value: T;
@@ -34,6 +40,9 @@ export interface ExtractionResult {
   amountInclTax: ExtractedField<number>; // 円・整数（税込）
   documentType: ExtractedField<DocType>;
   registrationNumber: ExtractedField<string | null>; // "T"+13桁 or null
+  /** 支払期日（請求書のみ。読めなければ null） */
+  dueDate?: ExtractedField<string | null>;
+  paymentMethod?: PaymentMethod | null;
   overallConfidence: number;
   model: string;
   raw?: unknown;
@@ -62,6 +71,11 @@ export interface DocumentRecord {
   // 分類タグ（部門＝事業/プロジェクト、科目＝勘定科目）
   department?: string | null;
   account?: string | null;
+  // 支払い管理（請求書の支払い忘れ防止）。未設定=未確認
+  paymentStatus?: PaymentStatus | null;
+  dueDate?: string | null; // "YYYY-MM-DD"
+  paidAt?: string | null; // "YYYY-MM-DD"
+  paymentMethod?: PaymentMethod | null;
   usage?: ExtractionUsage; // [COST-DEBUG] ★本番前に削除★
   // 原本
   mimeType: string;

@@ -14,7 +14,18 @@ import type {
   DocType,
   DocumentRecord,
   ExtractionResult,
+  PaymentMethod,
+  PaymentStatus,
 } from "@/lib/types";
+import { defaultPaymentFor } from "@/lib/payments";
+
+/** 支払い項目の変更内容 */
+export type PaymentPatch = {
+  paymentStatus?: PaymentStatus | null;
+  dueDate?: string | null;
+  paidAt?: string | null;
+  paymentMethod?: PaymentMethod | null;
+};
 import { MOCK_DOCUMENTS, MOCK_AUDIT_LOGS } from "@/lib/mock-data";
 import { applyExtraction, confirmDraft } from "@/lib/flow";
 import { buildFileName, monthKey, storedPathOf } from "@/lib/format";
@@ -25,8 +36,9 @@ import {
   apiCreateDocument,
   apiDeleteDocument,
   apiGetDocument,
+  apiBulkPayments,
   apiListAudit,
-  apiListDocuments,
+  apiListDocumentsWithFeatures,
   apiListTrash,
   apiPatchDocument,
   apiRestoreDocument,
@@ -63,6 +75,12 @@ interface StoreValue {
   loadState: LoadState;
   /** 一覧を読み込み直す（失敗時の「再読み込み」ボタン用） */
   reloadDocuments: () => void;
+  /** 支払い管理が使えるか（サーバーが対応済みのときだけtrue。未対応なら従来の画面のまま） */
+  paymentsEnabled: boolean;
+  /** 1件の支払い項目を更新（即時反映・失敗時は元に戻して例外） */
+  setPayment: (id: string, patch: PaymentPatch) => Promise<void>;
+  /** まとめて支払い状況を更新。更新件数を返す */
+  bulkSetPayment: (ids: string[], patch: PaymentPatch) => Promise<number>;
   processUpload: (file: UploadMeta) => Promise<DocumentRecord>;
   confirmDocument: (id: string, draft: ConfirmDraft) => void;
   getSessionFile: (id: string) => SessionFile | undefined;
@@ -135,14 +153,17 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     realMode ? "loading" : "ready",
   );
   const loadSeq = useRef(0);
+  // 支払い管理: デモは常に有効。本番はサーバーが対応済みと返したときだけ有効。
+  const [paymentsEnabled, setPaymentsEnabled] = useState(!realMode);
 
   // ── 本番モード: APIから一覧取得（成功ならtrue） ──
   const refetch = useCallback(async (): Promise<boolean> => {
     try {
       const token = await getIdToken();
       if (!token) return false;
-      const rows = await apiListDocuments(token);
+      const { rows, features } = await apiListDocumentsWithFeatures(token);
       setDocuments(rows.map(mapApiDoc));
+      setPaymentsEnabled(features.payments);
       // 操作履歴も更新（設定画面の履歴表示用）
       apiListAudit(token)
         .then((logs) => setAuditLogs(logs.map(mapApiAudit)))
@@ -333,6 +354,8 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
           const mimeType = d?.mimeType ?? "application/pdf";
           const fileName = buildFileName({ ...draft, mimeType });
           const ym = monthKey(draft.transactionDate);
+          // 書類の種類を直した場合は、支払状況の初期値も合わせる（例: 領収書→請求書なら未払い）
+          const typeChanged = paymentsEnabled && d && d.documentType !== draft.documentType;
           await apiPatchDocument(token, id, {
             transactionDate: draft.transactionDate,
             partnerName: draft.partnerName,
@@ -342,6 +365,9 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
             memo: draft.memo ?? null,
             fileName,
             storedPath: ym ? storedPathOf(ym) : null,
+            ...(typeChanged
+              ? defaultPaymentFor(draft.documentType, draft.transactionDate)
+              : {}),
             confirm: true, // 要確認→保存済みへ確定
           });
           await refetch();
@@ -350,9 +376,85 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       }
       const at = new Date().toISOString();
       setDocuments((prev) =>
-        prev.map((d) => (d.id === id ? confirmDraft(d, draft, at) : d)),
+        prev.map((d) => {
+          if (d.id !== id) return d;
+          const next = confirmDraft(d, draft, at);
+          return d.documentType !== draft.documentType
+            ? { ...next, ...defaultPaymentFor(draft.documentType, draft.transactionDate) }
+            : next;
+        }),
       );
       addLog({ documentId: id, action: "confirm", actor: "あなた", detail: "確認して保存済みへ確定" });
+    },
+    [realMode, getIdToken, refetch, addLog, paymentsEnabled],
+  );
+
+  // ── 支払い管理 ──
+  const setPayment = useCallback(
+    async (id: string, patch: PaymentPatch) => {
+      const before = docsRef.current.find((x) => x.id === id);
+      if (!before) return;
+      // 即時反映（1タップ消し込みの体感を速く）
+      setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+      if (!realMode) {
+        addLog({
+          documentId: id,
+          action: "update",
+          actor: "あなた",
+          detail:
+            patch.paymentStatus === "paid"
+              ? "支払い済みにしました"
+              : patch.paymentStatus === "unpaid"
+                ? "未払いに戻しました"
+                : "支払い情報を変更しました",
+        });
+        return;
+      }
+      try {
+        const token = await getIdToken();
+        if (!token) throw new Error("ログインが必要です");
+        await apiPatchDocument(token, id, patch);
+        await refetch();
+      } catch (err) {
+        // 失敗したら元に戻す（保存されたと誤解させない）
+        setDocuments((prev) => prev.map((d) => (d.id === id ? before : d)));
+        throw err;
+      }
+    },
+    [realMode, getIdToken, refetch, addLog],
+  );
+
+  const bulkSetPayment = useCallback(
+    async (ids: string[], patch: PaymentPatch): Promise<number> => {
+      if (ids.length === 0 || !patch.paymentStatus) return 0;
+      const idSet = new Set(ids);
+      const before = docsRef.current.filter((d) => idSet.has(d.id));
+      setDocuments((prev) => prev.map((d) => (idSet.has(d.id) ? { ...d, ...patch } : d)));
+      if (!realMode) {
+        addLog({
+          documentId: null,
+          action: "update",
+          actor: "あなた",
+          detail: `${ids.length}件の支払い状況をまとめて変更しました`,
+        });
+        return ids.length;
+      }
+      try {
+        const token = await getIdToken();
+        if (!token) throw new Error("ログインが必要です");
+        const res = await apiBulkPayments(token, {
+          ids,
+          paymentStatus: patch.paymentStatus,
+          paidAt: patch.paidAt ?? null,
+          paymentMethod: patch.paymentMethod ?? null,
+        });
+        await refetch();
+        return res.updated;
+      } catch (err) {
+        const map = new Map(before.map((d) => [d.id, d]));
+        setDocuments((prev) => prev.map((d) => map.get(d.id) ?? d));
+        throw err;
+      }
     },
     [realMode, getIdToken, refetch, addLog],
   );
@@ -485,6 +587,9 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       auditLogs,
       loadState,
       reloadDocuments,
+      paymentsEnabled,
+      setPayment,
+      bulkSetPayment,
       processUpload,
       confirmDocument,
       getSessionFile,
@@ -496,7 +601,7 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       getTrash,
       resetDemo,
     }),
-    [documents, auditLogs, loadState, reloadDocuments, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, setTags, deleteDocument, restoreDocument, getTrash, resetDemo],
+    [documents, auditLogs, loadState, reloadDocuments, paymentsEnabled, setPayment, bulkSetPayment, processUpload, confirmDocument, getSessionFile, getOriginalBlob, setMemo, setTags, deleteDocument, restoreDocument, getTrash, resetDemo],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

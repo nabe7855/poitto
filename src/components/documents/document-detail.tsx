@@ -22,6 +22,7 @@ import { StatusBadge } from "@/components/ui/badges";
 import { VoiceMemoField } from "@/components/review/voice-memo-field";
 import { TagEditor } from "@/components/documents/tag-editor";
 import { DocumentPreview } from "@/components/documents/document-preview";
+import { PaymentPanel } from "@/components/payments/payment-panel";
 import { useDocuments } from "@/lib/store/documents-store";
 import { duplicatesOf } from "@/lib/duplicates";
 import { documentsToCsv, csvWithBom } from "@/lib/csv";
@@ -171,6 +172,9 @@ export function DocumentDetail({
               {doc.usage.model}）
             </div>
           )}
+
+          {/* 支払い（請求書のみ） */}
+          <PaymentPanel doc={doc} />
 
           {/* 分類（部門・科目） */}
           <div>

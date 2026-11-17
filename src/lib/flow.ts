@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { REQUIRED_FIELDS, REVIEW_THRESHOLD } from "./types";
 import { buildFileName, monthKey, storedPathOf } from "./format";
+import { defaultPaymentFor } from "./payments";
 
 /** 抽出結果のフィールド別確信度をまとめる */
 export function confidenceMap(
@@ -59,6 +60,10 @@ export function applyExtraction(
     model: r.model,
     fileName: stored ? buildFileName(fields) : null,
     storedPath: stored && ym ? storedPathOf(ym) : null,
+    // 支払い管理: 書類の種類から初期の支払状況（請求書=未払い、領収書=支払済み）
+    ...defaultPaymentFor(r.documentType.value, r.transactionDate.value),
+    dueDate: r.documentType.value === "invoice" ? (r.dueDate?.value ?? null) : null,
+    paymentMethod: r.paymentMethod ?? null,
     usage: r.usage, // [COST-DEBUG] ★本番前に削除★
     confirmedAt: null,
   };

@@ -1,14 +1,35 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_ITEMS } from "./nav";
+import { NAV_ITEMS, type NavItem } from "./nav";
 import { ROUTES } from "@/lib/routes";
 import { useDocuments } from "@/lib/store/documents-store";
+import { paymentSummary } from "@/lib/payments";
 
-function useReviewCount() {
-  const { documents } = useDocuments();
-  return documents.filter((d) => d.status === "review").length;
+/** 表示する項目と、各バッジの件数・色 */
+function useNav() {
+  const { documents, paymentsEnabled } = useDocuments();
+  return useMemo(() => {
+    const items = NAV_ITEMS.filter(
+      (i) => i.requires !== "payments" || paymentsEnabled,
+    );
+    const review = documents.filter((d) => d.status === "review").length;
+    const pay = paymentsEnabled ? paymentSummary(documents) : null;
+    const badgeOf = (item: NavItem): { count: number; tone: string } | null => {
+      if (item.badge === "review" && review > 0)
+        return { count: review, tone: "bg-amber" };
+      if (item.badge === "payments" && pay && pay.alertCount > 0)
+        return {
+          count: pay.alertCount,
+          // 期限切れがあれば強い色
+          tone: pay.overdue.length > 0 ? "bg-coral" : "bg-amber",
+        };
+      return null;
+    };
+    return { items, badgeOf };
+  }, [documents, paymentsEnabled]);
 }
 
 function isActive(pathname: string, href: string) {
@@ -20,13 +41,14 @@ function isActive(pathname: string, href: string) {
 /** サイドバー内の縦並びナビ */
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const REVIEW_COUNT = useReviewCount();
+  const { items, badgeOf } = useNav();
 
   return (
     <nav className="flex flex-col gap-1">
-      {NAV_ITEMS.map(({ href, label, icon: Icon, badge }) => {
+      {items.map((item) => {
+        const { href, label, icon: Icon } = item;
         const active = isActive(pathname, href);
-        const showBadge = badge === "review" && REVIEW_COUNT > 0;
+        const badge = badgeOf(item);
         return (
           <Link
             key={href}
@@ -42,9 +64,11 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           >
             <Icon size={20} stroke={1.75} className="shrink-0" />
             <span className="flex-1">{label}</span>
-            {showBadge && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber px-1.5 text-xs font-bold text-white">
-                {REVIEW_COUNT}
+            {badge && (
+              <span
+                className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold text-white ${badge.tone}`}
+              >
+                {badge.count}
               </span>
             )}
           </Link>
@@ -57,13 +81,17 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 /** モバイル下部の横並びタブ */
 export function BottomNav() {
   const pathname = usePathname();
-  const REVIEW_COUNT = useReviewCount();
+  const { items, badgeOf } = useNav();
 
   return (
-    <nav className="grid grid-cols-6">
-      {NAV_ITEMS.map(({ href, label, shortLabel, icon: Icon, badge }) => {
+    <nav
+      className="grid"
+      style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+    >
+      {items.map((item) => {
+        const { href, label, shortLabel, icon: Icon } = item;
         const active = isActive(pathname, href);
-        const showBadge = badge === "review" && REVIEW_COUNT > 0;
+        const badge = badgeOf(item);
         return (
           <Link
             key={href}
@@ -76,9 +104,11 @@ export function BottomNav() {
           >
             <span className="relative">
               <Icon size={22} stroke={active ? 2 : 1.6} />
-              {showBadge && (
-                <span className="absolute -right-2 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber px-1 text-[10px] font-bold text-white">
-                  {REVIEW_COUNT}
+              {badge && (
+                <span
+                  className={`absolute -right-2 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ${badge.tone}`}
+                >
+                  {badge.count}
                 </span>
               )}
             </span>

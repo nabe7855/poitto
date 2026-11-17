@@ -25,8 +25,37 @@ async function apiFetch(
 export type ApiRow = Record<string, unknown>;
 
 export async function apiListDocuments(token: string): Promise<ApiRow[]> {
-  const json = (await apiFetch("/documents", token)) as { documents?: ApiRow[] };
-  return json.documents ?? [];
+  return (await apiListDocumentsWithFeatures(token)).rows;
+}
+
+/** 一覧＋サーバーが対応している機能（支払い管理など）を返す */
+export async function apiListDocumentsWithFeatures(
+  token: string,
+): Promise<{ rows: ApiRow[]; features: { payments: boolean } }> {
+  const json = (await apiFetch("/documents", token)) as {
+    documents?: ApiRow[];
+    features?: { payments?: boolean };
+  };
+  return {
+    rows: json.documents ?? [],
+    features: { payments: json.features?.payments === true },
+  };
+}
+
+/** 支払い状況の一括更新（まとめて消し込み・過去分の整理） */
+export async function apiBulkPayments(
+  token: string,
+  body: {
+    ids: string[];
+    paymentStatus: string;
+    paidAt?: string | null;
+    paymentMethod?: string | null;
+  },
+): Promise<{ ok: boolean; updated: number }> {
+  return (await apiFetch("/payments/bulk", token, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })) as { ok: boolean; updated: number };
 }
 
 export async function apiCreateDocument(

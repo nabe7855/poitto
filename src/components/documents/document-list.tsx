@@ -12,6 +12,8 @@ import { DocTypeBadge, StatusBadge } from "@/components/ui/badges";
 import { DocumentDetail } from "./document-detail";
 import { useDocuments } from "@/lib/store/documents-store";
 import { duplicateIdSet } from "@/lib/duplicates";
+import { effectivePayment, isPayable } from "@/lib/payments";
+import { PaymentChip } from "@/components/payments/parts";
 
 /** 証憑の一覧（レスポンシブなリスト行）。行クリックで詳細（メモ編集・個別DL）を開く。 */
 export function DocumentList({
@@ -23,7 +25,7 @@ export function DocumentList({
   showStatus?: boolean;
   emptyText?: string;
 }) {
-  const { documents: allDocs } = useDocuments();
+  const { documents: allDocs, paymentsEnabled } = useDocuments();
   const dupIds = useMemo(() => duplicateIdSet(allDocs), [allDocs]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = documents.find((d) => d.id === selectedId) ?? null;
@@ -56,6 +58,9 @@ export function DocumentList({
             <p className="mt-0.5 flex items-center gap-2 text-xs text-ink/50">
               <span className="truncate">{d.partnerName ?? "—"}</span>
               <DocTypeBadge type={d.documentType} />
+              {paymentsEnabled && isPayable(d) && effectivePayment(d) === "unpaid" && (
+                <PaymentChip doc={d} size="sm" />
+              )}
               {dupIds.has(d.id) && (
                 <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber">
                   <IconCopy size={11} stroke={2} />

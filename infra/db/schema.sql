@@ -78,6 +78,14 @@ alter table documents add column if not exists department text;
 alter table documents add column if not exists account text;
 create index if not exists idx_documents_tenant_department on documents (tenant_id, department);
 create index if not exists idx_documents_tenant_account    on documents (tenant_id, account);
+-- 支払い管理（請求書の支払い忘れ防止）。列の追加のみ。既存行はNULL（=未確認）のまま変更しない。
+alter table documents add column if not exists payment_status text
+  check (payment_status in ('unpaid','paid','not_applicable'));
+alter table documents add column if not exists due_date date;
+alter table documents add column if not exists paid_at date;
+alter table documents add column if not exists payment_method text
+  check (payment_method in ('transfer','debit','card','cash'));
+create index if not exists idx_documents_tenant_due on documents (tenant_id, due_date);
 
 -- ============================================================
 -- 監査ログ

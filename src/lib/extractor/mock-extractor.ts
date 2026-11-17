@@ -1,4 +1,9 @@
-import type { DocType, ExtractionInput, ExtractionResult } from "@/lib/types";
+import type {
+  DocType,
+  ExtractionInput,
+  ExtractionResult,
+  PaymentMethod,
+} from "@/lib/types";
 import { estimateCostJpy } from "@/lib/ai-cost"; // [COST-DEBUG] ★本番前に削除★
 import type { Extractor } from "./extractor";
 
@@ -24,7 +29,17 @@ type Profile = {
   amountInclTax: number;
   /** この取引先は高確信で自動保存されるか（false は要確認に寄せる） */
   confident: boolean;
+  /** 支払期日（今日から何日後。請求書のみ） */
+  dueInDays?: number;
+  paymentMethod?: PaymentMethod;
 };
+
+/** 今日からn日後（ローカル日付 "YYYY-MM-DD"）。デモの期日を常に「今」基準で見せるため */
+function daysFromToday(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
 
 const PROFILES: Profile[] = [
   {
@@ -34,6 +49,8 @@ const PROFILES: Profile[] = [
     registrationNumber: "T8130001000053",
     amountInclTax: 71610,
     confident: true,
+    dueInDays: 13,
+    paymentMethod: "transfer",
   },
   {
     keywords: ["amazon", "アマゾン"],
@@ -50,6 +67,8 @@ const PROFILES: Profile[] = [
     registrationNumber: "T7010001067884",
     amountInclTax: 8250,
     confident: true,
+    dueInDays: 10,
+    paymentMethod: "debit",
   },
   {
     keywords: ["yamato", "ヤマト", "kuroneko"],
@@ -58,6 +77,8 @@ const PROFILES: Profile[] = [
     registrationNumber: "T4010001008846",
     amountInclTax: 4620,
     confident: true,
+    dueInDays: 3,
+    paymentMethod: "transfer",
   },
 ];
 
@@ -117,6 +138,11 @@ export class MockExtractor implements Extractor {
         value: p.registrationNumber,
         confidence: p.registrationNumber ? c - 0.03 : 0,
       },
+      dueDate: {
+        value: p.dueInDays != null ? daysFromToday(p.dueInDays) : null,
+        confidence: p.dueInDays != null ? c : 0,
+      },
+      paymentMethod: p.paymentMethod ?? null,
       overallConfidence: c,
       model: this.name,
       raw: { source: "profile", partner: p.partnerName },
@@ -147,6 +173,12 @@ export class MockExtractor implements Extractor {
       amountInclTax: { value: amount, confidence: conf(lowAmount) },
       documentType: { value: type, confidence: 0.88 },
       registrationNumber: { value: null, confidence: 0 },
+      // 期日はばらつかせる（期限切れ・7日以内・それ以降・読めない）
+      dueDate:
+        type === "invoice" && h % 5 !== 0
+          ? { value: daysFromToday((h % 21) - 5), confidence: 0.85 }
+          : { value: null, confidence: 0 },
+      paymentMethod: null,
       overallConfidence: 0.7,
       model: this.name,
       raw: { source: "generated", fileName },

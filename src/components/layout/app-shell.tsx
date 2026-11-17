@@ -9,6 +9,7 @@ import { MobileDrawer } from "./mobile-drawer";
 import { BottomNav } from "./nav-links";
 import { DocumentsProvider } from "@/lib/store/documents-store";
 import { LoadStatusBanner } from "./load-status-banner";
+import { PaymentAlertBanner } from "./payment-alert-banner";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ROUTES, isAppRoute } from "@/lib/routes";
 
@@ -58,6 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-8">
             <div className="mx-auto w-full max-w-6xl">
               <LoadStatusBanner />
+              <PaymentAlertBanner />
               {children}
             </div>
           </main>

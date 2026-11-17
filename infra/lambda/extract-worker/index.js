@@ -144,7 +144,43 @@ async function processOne(tenantId, key, receiveCount = 1) {
     );
     fields.stored_path = storedPathOf(extraction.transactionDate);
   }
+  // 支払い管理: 書類の種類から初期の支払状況を決める（請求書=未払い、領収書=支払済み）
+  Object.assign(fields, paymentFieldsFor(extraction));
   await update(tenantId, key, fields, `抽出完了 → ${status}`, extraction);
+}
+
+// ── 支払い管理 ──
+const PAYMENT_METHODS = ["transfer", "debit", "card", "cash"];
+const PAYMENT_COLS = ["payment_status", "due_date", "paid_at", "payment_method"];
+
+/** "YYYY-MM-DD" として実在する日付か（不正値はDBのキャストで失敗するため弾く） */
+function validDate(s) {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+function paymentFieldsFor(ex) {
+  const method = PAYMENT_METHODS.includes(ex.paymentMethod) ? ex.paymentMethod : null;
+  if (ex.documentType === "invoice") {
+    return {
+      payment_status: "unpaid",
+      due_date: validDate(ex.dueDate) ? ex.dueDate : null,
+      payment_method: method,
+    };
+  }
+  if (ex.documentType === "receipt") {
+    return {
+      payment_status: "paid",
+      paid_at: validDate(ex.transactionDate) ? ex.transactionDate : null,
+      payment_method: method,
+    };
+  }
+  return { payment_status: "not_applicable" };
+}
+
+function isMissingColumn(err) {
+  return /column .* does not exist|42703/i.test(`${(err && err.message) || ""}`);
 }
 
 // 命名規則: 取引年月日_取引先名_税込金額_書類の種類.拡張子
@@ -175,9 +211,22 @@ function storedPathOf(date) {
 }
 
 async function update(tenantId, key, fields, detail, extraction) {
+  try {
+    await updateOnce(tenantId, key, fields, detail, extraction);
+  } catch (err) {
+    // 支払い列がまだDBに無い（スキーマ未適用）なら、支払い項目を除いて従来どおり保存する
+    if (!isMissingColumn(err) || !PAYMENT_COLS.some((c) => c in fields)) throw err;
+    console.warn("payment columns missing; saving without payment fields");
+    const legacy = { ...fields };
+    for (const c of PAYMENT_COLS) delete legacy[c];
+    await updateOnce(tenantId, key, legacy, detail, extraction);
+  }
+}
+
+async function updateOnce(tenantId, key, fields, detail, extraction) {
   await withTenant(tenantId, async (exec) => {
     // 列ごとの型キャスト（Data APIは文字列で渡すため date 等は明示キャストが必要）
-    const CAST = { transaction_date: "::date" };
+    const CAST = { transaction_date: "::date", due_date: "::date", paid_at: "::date" };
     const sets = ["status = :status"];
     const params = { key, status: fields.status, tid: tenantId };
     for (const col of [
@@ -188,6 +237,7 @@ async function update(tenantId, key, fields, detail, extraction) {
       "registration_number",
       "file_name",
       "stored_path",
+      ...PAYMENT_COLS,
     ]) {
       if (fields[col] !== undefined) {
         sets.push(`${col} = :${col}${CAST[col] || ""}`);
@@ -222,6 +272,12 @@ const SCHEMA = {
       enum: ["invoice", "receipt", "quote", "delivery", "other"],
     },
     registrationNumber: { type: "string", nullable: true },
+    // 支払い管理（任意項目。読めなければ null / none）
+    dueDate: { type: "string", nullable: true },
+    paymentMethod: {
+      type: "string",
+      enum: ["transfer", "debit", "card", "cash", "none"],
+    },
     confidence: {
       type: "object",
       properties: {
@@ -247,7 +303,9 @@ const PROMPT = `あなたは日本の経理実務に精通した証憑の項目�
   迷ったら「誰がお金を受け取るのか（請求してきた側）」を取引先にする。宛先（支払う側）ではない。
 - amountInclTax: 税込の合計金額（整数・カンマ/円記号なし）。「請求金額」「合計」「ご請求額」など総額。
 - documentType: invoice=請求書 / receipt=領収書 / quote=見積書 / delivery=納品書 / other。
-- registrationNumber: 適格請求書の登録番号 "T"+13桁。無ければ null。`;
+- registrationNumber: 適格請求書の登録番号 "T"+13桁。無ければ null。
+- dueDate: 支払期日。"YYYY-MM-DD"。「お支払期限」「お振込期限」「支払期日」「お支払い期日」「振込期日」などに書かれた日付。和暦は西暦へ。「〇月末」は月の末日に変換。期日の記載が無い・請求書以外なら null（推測で埋めないこと）。
+- paymentMethod: 支払方法。「口座振替」「自動引落」の記載=debit、クレジットカード払い=card、振込先口座の記載や振込の依頼=transfer、現金=cash。判断できなければ none。`;
 
 async function callGemini(base64, mimeType, orgName) {
   const key = await geminiApiKey();

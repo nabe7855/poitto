@@ -17,6 +17,7 @@ export const ROUTES = {
   home: APP_PREFIX,
   post: `${APP_PREFIX}/post`,
   review: `${APP_PREFIX}/review`,
+  payments: `${APP_PREFIX}/payments`,
   months: `${APP_PREFIX}/months`,
   search: `${APP_PREFIX}/search`,
   settings: `${APP_PREFIX}/settings`,

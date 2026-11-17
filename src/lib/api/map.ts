@@ -6,6 +6,8 @@ import type {
   DocumentRecord,
   ExtractionUsage,
   FieldKey,
+  PaymentMethod,
+  PaymentStatus,
 } from "@/lib/types";
 import { estimateCostJpy } from "@/lib/ai-cost"; // [COST-DEBUG] ★本番前に削除★
 import type { ApiRow } from "./client";
@@ -70,6 +72,10 @@ export function mapApiDoc(row: ApiRow): DocumentRecord {
     memo: (row.memo as string) ?? null,
     department: (row.department as string) ?? null,
     account: (row.account as string) ?? null,
+    paymentStatus: (row.payment_status as PaymentStatus) ?? null,
+    dueDate: (row.due_date as string) ?? null,
+    paidAt: (row.paid_at as string) ?? null,
+    paymentMethod: (row.payment_method as PaymentMethod) ?? null,
     usage, // [COST-DEBUG] ★本番前に削除★
     mimeType: (row.mime_type as string) ?? "application/pdf",
     sizeBytes: num(row.size_bytes) ?? 0,

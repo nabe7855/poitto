@@ -21,6 +21,7 @@ import { useDocuments } from "@/lib/store/documents-store";
 import { isRealMode } from "@/lib/auth/config";
 
 import { ROUTES } from "@/lib/routes";
+import { HomePaymentsCard } from "@/components/payments/home-payments-card";
 export default function HomePage() {
   const { documents, loadState } = useDocuments();
   const loading = loadState !== "ready";
@@ -86,6 +87,9 @@ export default function HomePage() {
   return (
     <>
       <PageHeader title="ホーム" description="今月の状況をひと目で。" />
+
+      {/* 支払いの期限が近い／過ぎた請求書（無ければ表示しない） */}
+      <HomePaymentsCard />
 
       {/* サマリーカード */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">

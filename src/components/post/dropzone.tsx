@@ -14,6 +14,7 @@ import {
 import { StatusBadge } from "@/components/ui/badges";
 import { VoiceMemoField } from "@/components/review/voice-memo-field";
 import { TagEditor } from "@/components/documents/tag-editor";
+import { PaymentQuick } from "@/components/payments/payment-quick";
 import {
   formatBytes,
   displayName,
@@ -394,6 +395,9 @@ function ConversionResult({ result }: { result: DocumentRecord }) {
           <Chip label="登録番号" value={result.registrationNumber} />
         )}
       </div>
+
+      {/* 支払いの案内（請求書は「お支払いはまだです」を並べて表示） */}
+      <PaymentQuick doc={result} />
 
       {/* その場で分類（部門・科目）とメモを追加 */}
       <TagEditor doc={result} />

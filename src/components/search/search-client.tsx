@@ -3,7 +3,12 @@
 import { useMemo, useState } from "react";
 import { IconDownload, IconSearch, IconX } from "@tabler/icons-react";
 import type { DocStatus, DocType } from "@/lib/types";
-import { filterDocuments, sumAmount, type SearchFilters } from "@/lib/selectors";
+import {
+  filterDocuments,
+  sumAmount,
+  type PaymentFilter,
+  type SearchFilters,
+} from "@/lib/selectors";
 import { useDocuments } from "@/lib/store/documents-store";
 import { DocumentList } from "@/components/documents/document-list";
 import { DOC_TYPE_LABEL, formatYen } from "@/lib/format";
@@ -30,6 +35,14 @@ const STATUS_OPTIONS: { value: DocStatus | "all"; label: string }[] = [
   { value: "extracting", label: "抽出中" },
 ];
 
+const PAYMENT_OPTIONS: { value: PaymentFilter; label: string }[] = [
+  { value: "all", label: "すべて" },
+  { value: "unpaid", label: "未払い" },
+  { value: "overdue", label: "期限切れ" },
+  { value: "paid", label: "支払済み" },
+  { value: "unknown", label: "未確認" },
+];
+
 const EMPTY: SearchFilters = {
   from: "",
   to: "",
@@ -38,10 +51,11 @@ const EMPTY: SearchFilters = {
   status: "all",
   department: "",
   account: "all",
+  payment: "all",
 };
 
 export function SearchClient() {
-  const { documents } = useDocuments();
+  const { documents, paymentsEnabled } = useDocuments();
   const [f, setF] = useState<SearchFilters & { amountMinStr?: string; amountMaxStr?: string }>(
     EMPTY,
   );
@@ -58,10 +72,11 @@ export function SearchClient() {
         status: f.status,
         department: f.department || undefined,
         account: f.account,
+        payment: paymentsEnabled ? f.payment : "all",
       },
       documents,
     );
-  }, [f, documents]);
+  }, [f, documents, paymentsEnabled]);
 
   // 科目の選択肢: プリセット ∪ 実際に使われている科目
   const accountOptions = useMemo(() => {
@@ -73,12 +88,15 @@ export function SearchClient() {
   const total = sumAmount(results);
 
   function handleCsvDownload() {
-    downloadCsv(csvWithBom(documentsToCsv(results)), "poitto_証憑一覧.csv");
+    downloadCsv(
+      csvWithBom(documentsToCsv(results, { withPayment: paymentsEnabled })),
+      "poitto_証憑一覧.csv",
+    );
   }
 
   function handleAccountingCsvDownload() {
     downloadCsv(
-      csvWithBom(documentsToAccountingCsv(results)),
+      csvWithBom(documentsToAccountingCsv(results, { withPayment: paymentsEnabled })),
       "poitto_会計取込用.csv",
     );
   }
@@ -225,6 +243,28 @@ export function SearchClient() {
               ))}
             </select>
           </div>
+
+          {/* 支払状況（請求書） */}
+          {paymentsEnabled && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/70">
+                支払状況（請求書）
+              </label>
+              <select
+                value={f.payment ?? "all"}
+                onChange={(e) =>
+                  setF({ ...f, payment: e.target.value as PaymentFilter })
+                }
+                className={inputCls}
+              >
+                {PAYMENT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex items-center gap-2">

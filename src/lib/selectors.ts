@@ -1,6 +1,7 @@
 import type { DocStatus, DocType, DocumentRecord } from "./types";
 import { MOCK_DOCUMENTS } from "./mock-data";
 import { monthKey } from "./format";
+import { bucketOf, effectivePayment, isPayable } from "./payments";
 
 /** デモの基準月（受入基準が2026年6月のため） */
 export const DEMO_MONTH = "2026-06";
@@ -68,6 +69,20 @@ export interface SearchFilters {
   status?: DocStatus | "all";
   department?: string; // 部分一致
   account?: string; // "all" もしくは科目名（完全一致）
+  /** 支払状況（請求書が対象） */
+  payment?: PaymentFilter;
+}
+
+export type PaymentFilter = "all" | "unpaid" | "overdue" | "paid" | "unknown";
+
+function matchesPayment(d: DocumentRecord, f: PaymentFilter): boolean {
+  if (f === "all") return true;
+  if (!isPayable(d)) return false;
+  const eff = effectivePayment(d);
+  if (f === "unpaid") return eff === "unpaid";
+  if (f === "overdue") return bucketOf(d) === "overdue";
+  if (f === "paid") return eff === "paid" || eff === "auto_paid";
+  return eff === "unknown";
 }
 
 export function filterDocuments(
@@ -87,6 +102,7 @@ export function filterDocuments(
       if (status && status !== "all" && d.status !== status) return false;
       if (department && !(d.department ?? "").includes(department)) return false;
       if (account && account !== "all" && d.account !== account) return false;
+      if (filters.payment && !matchesPayment(d, filters.payment)) return false;
       return true;
     })
     .sort((a, b) => {

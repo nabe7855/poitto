@@ -20,11 +20,16 @@ function useNav() {
     const badgeOf = (item: NavItem): { count: number; tone: string } | null => {
       if (item.badge === "review" && review > 0)
         return { count: review, tone: "bg-amber" };
-      if (item.badge === "payments" && pay && pay.alertCount > 0)
+      // ヘッダーの「未払い ◯件」と同じ件数。色は緊急度（期限切れ>7日以内>それ以外）
+      if (item.badge === "payments" && pay && pay.unpaid.length > 0)
         return {
-          count: pay.alertCount,
-          // 期限切れがあれば強い色
-          tone: pay.overdue.length > 0 ? "bg-coral" : "bg-amber",
+          count: pay.unpaid.length,
+          tone:
+            pay.overdue.length > 0
+              ? "bg-coral"
+              : pay.soon.length > 0
+                ? "bg-amber"
+                : "bg-ink/40",
         };
       return null;
     };

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { IconMenu2, IconMailbox, IconLogout } from "@tabler/icons-react";
 import { useAuth } from "@/lib/auth/auth-context";
+import { UnpaidIndicator } from "@/components/payments/unpaid-indicator";
 
 import { ROUTES } from "@/lib/routes";
 export function Header({ onMenuClick }: { onMenuClick: () => void }) {
@@ -33,6 +34,9 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
       </Link>
 
       <div className="flex-1" />
+
+      {/* 未払いの件数（全ページ共通・押すと支払い画面へ） */}
+      <UnpaidIndicator />
 
       {/* 投函ショートカット */}
       <Link
